@@ -12,9 +12,7 @@ def text_wo_footnotes(dict_ftn, dict_txt):
     for key, page in dict_txt.items():
         if dict_ftn.get(key):  # vérifie que des footnotes existent pour cette page
             first_footnote_words = dict_ftn[key][0][:10].replace('1,', '1.')
-            print("LA lES FOOTNOTES")
             print(first_footnote_words)
-            print("PAAAAAAGE")
             print(page)
             marker_pos = page.find(first_footnote_words)
 

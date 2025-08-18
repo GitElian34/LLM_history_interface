@@ -414,7 +414,6 @@ class PDFTextProcessor:
         output_path_ftn = "C:/Users/elian/Documents/stage/Recherche/output/footnotes_pdf.docx"
         # self.replacenum(self.dict_to_text(self.content),data_clear,RGBColor(255,0,0),self.periode_histo,output_path_cont)
         # self.replacenum(self.dict_to_text(self.foot_notes), data_clear_ftn, RGBColor(0, 0, 255), self.periode_histo_ftn, output_path_ftn )
-        print("hehehehehehehheheehhehehe")
         texte_clean = text_wo_footnotes(self.foot_notes,extraire_texte_pdf_par_page(input_path))
         self.app_content = self.number_to_bold(texte_clean, self.data_clear, self.entities_by_type, self.periode_histo)
 

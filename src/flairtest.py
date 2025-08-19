@@ -23,24 +23,6 @@ methods_grade = {
 }
 
 
-def insert_into_db(word: str, type_: str, method: str):
-    """Insère une entité dans la base SQLite"""
-    conn = sqlite3.connect(DB_PATH)
-    cur = conn.cursor()
-    methods_grade[method][1] += 1
-    normalized_word = re.sub(r'[\s-]', '', word).lower()
-    try:
-        cur.execute("""
-            INSERT INTO items (word, type, method)
-            VALUES (?, ?, ?)
-        """, (word, type_, method))
-        conn.commit()
-    except sqlite3.IntegrityError:
-        # Ignore si déjà présent
-        pass
-    finally:
-        conn.close()
-
 
 def get_all_db_data():
     """Récupère toutes les données de la table items"""
@@ -108,18 +90,21 @@ def find_entities_stanza(text: str, entities_by_type: Dict[str, List[str]]):
         for entity in sentence.ents:
             if entity.type == 'PERSON':
                 entities_by_type['PERSON'].append(entity.text)
-
-                insert_into_db(entity.text, "PERSON", "Stanza")
+                methods_grade["Stanza"][1] += 1
+                normalized_word = re.sub(r'[\s-]', '', entity.text).lower()
+                insert_item(normalized_word, "PERSON", "Stanza")
             elif entity.type in ['LOC', 'GPE']:
                 entities_by_type['LOC'].append(entity.text)
-
-                insert_into_db(entity.text, "LOC", "Stanza")
+                methods_grade["Stanza"][1] += 1
+                normalized_word = re.sub(r'[\s-]', '', entity.text).lower()
+                insert_item(normalized_word, "LOC", "Stanza")
             elif entity.type == 'ORG':
                 entities_by_type['ORG'].append(entity.text)
-                insert_into_db(entity.text, "ORG", "Stanza")
-
-def findREN(text: str, entities_by_type: Dict[str, List[str]]):
-    """Méthode originale avec spaCy"""
+                methods_grade["Stanza"][1] += 1
+                normalized_word = re.sub(r'[\s-]', '', entity.text).lower()
+                insert_item(normalized_word, "ORG", "Stanza")
+def findREN(text: str,threshold : float, entities_by_type: Dict[str, List[str]]):
+    """Méthode originale avec spaCy + Flair"""
     doc = nlp(text)
     for sent in doc.sents:
         flair_sentence = Sentence(sent.text)
@@ -128,16 +113,23 @@ def findREN(text: str, entities_by_type: Dict[str, List[str]]):
         for entity in flair_sentence.get_spans('ner'):
             entity_text = entity.text
             entity_label = entity.tag
+            confidence = entity.score   # 🔥 score de certitude
+            normalized_word = re.sub(r'[\s-]', '', entity_text).lower()
 
-            if entity_label == 'PER':
+            print(f"Trouvé: {entity_text} | Label: {entity_label} | Confiance: {confidence:.2f}")
+
+            if entity_label == 'PER' and confidence > threshold:
                 entities_by_type['PERSON'].append(entity_text)
-                insert_into_db(entity_text, "PERSON", "findREN")
-            elif entity_label in ['LOC', 'GPE']:
+                methods_grade["findREN"][1] += 1
+               # insert_item(normalized_word, "PERSON", "findREN", pertinence=f"{confidence:.2f}")
+            elif entity_label in ['LOC', 'GPE'] and confidence > threshold:
                 entities_by_type['LOC'].append(entity_text)
-                insert_into_db(entity_text, "LOC", "findREN")
-            elif entity_label == 'ORG':
+                methods_grade["findREN"][1] += 1
+                #insert_item(normalized_word, "LOC", "findREN", pertinence=f"{confidence:.2f}")
+            elif entity_label == 'ORG' and confidence > threshold:
                 entities_by_type['ORG'].append(entity_text)
-                insert_into_db(entity_text, "ORG", "findREN")
+                methods_grade["findREN"][1] += 1
+                #insert_item(normalized_word, "ORG", "findREN", pertinence=f"{confidence:.2f}")
 
 
 def findREN_nospacy(text: str, entities_by_type: Dict[str, List[str]]):
@@ -151,47 +143,57 @@ def findREN_nospacy(text: str, entities_by_type: Dict[str, List[str]]):
             for entity in flair_sentence.get_spans('ner'):
                 entity_text = entity.text
                 entity_label = entity.tag
+                normalized_word = re.sub(r'[\s-]', '', entity_text).lower()
 
                 if entity_label == 'PER':
                     entities_by_type['PERSON'].append(entity_text)
-                    insert_into_db(entity_text, "PERSON", "findREN_nospacy")
+                    methods_grade["findREN_nospacy"][1] += 1
+                    insert_item(normalized_word, "PERSON", "findREN_nospacy")
                 elif entity_label in ['LOC', 'GPE']:
                     entities_by_type['LOC'].append(entity_text)
-                    insert_into_db(entity_text, "LOC", "findREN_nospacy")
+                    methods_grade["findREN_nospacy"][1] += 1
+                    insert_item(normalized_word, "LOC", "findREN_nospacy")
                 elif entity_label == 'ORG':
                     entities_by_type['ORG'].append(entity_text)
-                    insert_into_db(entity_text, "ORG", "findREN_nospacy")
+                    methods_grade["findREN_nospacy"][1] += 1
+                    insert_item(normalized_word, "ORG", "findREN_nospacy")
 
 
 def findREN_fulltext(text: str, entities_by_type: Dict[str, List[str]]):
     """Extraction sur tout le texte en une seule passe"""
     flair_sentence = Sentence(text)
     tagger.predict(flair_sentence)
+
     for entity in flair_sentence.get_spans('ner'):
         entity_text = entity.text
         entity_label = entity.tag
+        normalized_word = re.sub(r'[\s-]', '', entity_text).lower()
+
         if entity_label == 'PER':
             entities_by_type['PERSON'].append(entity_text)
-
-            insert_into_db(entity_text, "PERSON", "findREN_fulltext")
+            methods_grade["findREN_fulltext"][1] += 1
+            insert_item(normalized_word, "PERSON", "findREN_fulltext")
         elif entity_label in ['LOC', 'GPE']:
             entities_by_type['LOC'].append(entity_text)
-
-            insert_into_db(entity_text, "LOC", "findREN_fulltext")
+            methods_grade["findREN_fulltext"][1] += 1
+            insert_item(normalized_word, "LOC", "findREN_fulltext")
         elif entity_label == 'ORG':
             entities_by_type['ORG'].append(entity_text)
+            methods_grade["findREN_fulltext"][1] += 1
+            insert_item(normalized_word, "ORG", "findREN_fulltext")
 
-            insert_into_db(entity_text, "ORG", "findREN_fulltext")
+
+
 def filldatabase(text):
     # # Test avec méthode originale (spaCy)
-
+    reset_database()
     for page_num, page in text.items():
         entities_by_type = {'PERSON': [], 'LOC': [], 'ORG': []}
         print("\n--- Avec spaCy ---")
-        findREN(page, entities_by_type)
+        findREN(page,0.90 ,entities_by_type)
         print({k: set(v) for k, v in entities_by_type.items()})
-        #
-        # # Test sans spaCy
+
+        # # # Test sans spaCy
         entities_by_type = {'PERSON': [], 'LOC': [], 'ORG': []}
         print("\n--- Sans spaCy ---")
         findREN_nospacy(page, entities_by_type)
@@ -202,25 +204,50 @@ def filldatabase(text):
         print("\n--- Texte entier ---")
         findREN_fulltext(page, entities_by_type)
         print({k: set(v) for k, v in entities_by_type.items()})
-
         entities_by_type = {'PERSON': [], 'LOC': [], 'ORG': []}
         print("\n--- STANZA---")
         find_entities_stanza(page, entities_by_type)
         print({k: set(v) for k, v in entities_by_type.items()})
 
 def compare_method(true_data):
-
+    """
+    Compare les entités détectées avec les données de référence (true_data).
+    Chaque élément de true_data ne peut être reconnu qu'une seule fois par méthode (row[2]).
+    """
+    tab = []
     db_content = get_all_db_data()
+
+    # Dictionnaire pour mémoriser les entités déjà validées par méthode
+    # Exemple : {"findREN": set(["barackobama", "etatsunis"]), "autreMethod": set([...])}
+    matched_by_method = {}
+
     for row in db_content['data']:
-        if is_entity_in_data(row[0],true_data) and len(row[0])>2:
-            methods_grade[row[2]][0] +=1
-            print(row[0])
-        else :
-            methods_grade[row[2]][0] -=0.0
-           # print("non trouvé")
+        word, type_, method = row[0], row[1], row[2]
 
-    print(methods_grade)
+        # Initialiser l'ensemble pour cette méthode si besoin
+        if method not in matched_by_method:
+            matched_by_method[method] = set()
 
+        # Vérifier si cette entité correspond à une des références
+        for true_entity in true_data:
+            normalized_true = normalize_string(true_entity)
+            normalized_word = normalize_string(word)
+
+            if len(word) > 2 and (
+                normalized_word in normalized_true or
+                any(w in normalized_word for w in normalized_true.split())
+            ):
+                # Vérifier si cette true_entity n'a pas déjà été comptée pour cette méthode
+                if normalized_true not in matched_by_method[method]:
+                    methods_grade[method][0] += 1
+                    matched_by_method[method].add(normalized_true)  # marquer comme compté
+
+
+                break  # sortir de la boucle sur true_data pour éviter plusieurs matches du même mot
+        else:
+            methods_grade[method][0] -= 0.0  # ne change rien, garde la logique existante
+
+    return methods_grade
 
 
 if __name__ == "__main__":
@@ -231,5 +258,5 @@ if __name__ == "__main__":
     true_data = ["Europe","Allemagne","Munich","Pays-Bas","Autriche","Emil Friedberg","Heinrich von Sybel"
                  ,"Theodor von Sickel","Markus Brantl","Georg Vogeler","BSB","DFG","Ludwig-Maximilian","Lizartech","Lehrstuhl für Geschichtliche Hilfswissenschaften"
                  ,"AT&T","Kaiserurkunden","Charles Le Chauve"]
-    compare_method(true_data)
+    print(compare_method(true_data))
 

@@ -6,6 +6,9 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QTextEdit, QVBoxLayout,
 from PyQt6.QtGui import QFont, QTextCharFormat
 from PyQt6.QtCore import Qt
 
+from src.database.db_insert import update_pertinence
+
+
 class MultiPageTextApp(QMainWindow):
     def __init__(self,bold_number,bold_names, pages=None,):
         super().__init__()
@@ -306,7 +309,7 @@ class StartupDialog(QDialog):
 
 
 class PopUpDialog(QDialog):
-    def __init__(self, mot, choices, question, checked_words,parent=None):
+    def __init__(self, mot, choices, question,color, checked_words,parent=None):
         """
         :param mot: Le mot ciblé pour contextualiser la question
         :param choices: Liste de chaînes représentant les choix (ex: ["Clairement Oui", "Plutôt Oui", ...])
@@ -314,6 +317,7 @@ class PopUpDialog(QDialog):
         :param parent: Parent Qt (optionnel)
         """
         super().__init__(parent)
+        self.color = color
         self.setWindowTitle(f"Choix pour : {mot}")
         self.setFixedSize(350, 150 + 30 * len(choices))
         self.mot = mot
@@ -340,8 +344,11 @@ class PopUpDialog(QDialog):
     def valider(self):
         selected_id = self.button_group.checkedId()
         if selected_id != -1:
-            self.reponse = self.radio_buttons[selected_id].text()
-            self.checked_words[self.mot] =self.reponse
+            if self.color =="#000000" :
+                update_pertinence(self.mot,"LLM",self.radio_buttons[selected_id].text())
+            else :
+                update_pertinence(self.mot,"findREN",self.radio_buttons[selected_id].text())
+
         self.accept()
 
 
@@ -416,8 +423,10 @@ class HoverTextEdit(QTextEdit):
                 # Afficher la PopUpDialog
                 dialog = PopUpDialog(
                     word,
+
                     choices=choices,
                     question=question,
+                    color=color,
                     checked_words =self.reponses_utilisateur
                 )
 

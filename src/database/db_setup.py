@@ -14,6 +14,7 @@ def create_table():
         word TEXT NOT NULL,
         type TEXT NOT NULL,
         method TEXT NOT NULL,
+        pertinence TEXT,                 -- colonne optionnelle
         PRIMARY KEY (word, method)
     )
     """)

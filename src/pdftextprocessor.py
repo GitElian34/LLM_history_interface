@@ -13,6 +13,8 @@ from tkinter import messagebox
 from collections import *
 from appli_Demo import SearchApp
 from typing import Union, List, Tuple
+
+from src.database.db_insert import insert_item
 #from src.SQL.crud import *
 #from src.SQL.config import SessionLocal, get_db
 #from src.SQL.main import init_db
@@ -214,13 +216,15 @@ class PDFTextProcessor:
             text += f"{page}:\n{content}\n\n"  # \n\n pour saut de ligne double entre pages
         return text.strip()  # .strip() pour supprimer le dernier \n inutile
 
-    def number_to_bold(self, dict, nombres_cibles,entities_by_type , epoques_cible: List[str], pattern=None):
+    def number_to_bold(self, dict, nombres_cibles, entities_by_type, epoques_cible: List[str], pattern=None):
         """
-        Entoure les nombres et époques cibles avec ** dans les valeurs du dictionnaire.
+        Entoure les nombres, entités et époques cibles avec des marqueurs spéciaux
+        dans les valeurs du dictionnaire, tout en affichant les correspondances trouvées.
 
         Args:
             dict: Dictionnaire contenant les valeurs à modifier
             nombres_cibles: Liste de nombres à mettre en évidence
+            entities_by_type: Dictionnaire contenant les entités classées par type (PERSON, LOC, ORG)
             epoques_cible: Liste d'époques à mettre en évidence
             pattern: Optionnel - motif regex prédéfini (non utilisé dans cette version)
 
@@ -234,57 +238,76 @@ class PDFTextProcessor:
         for key, value in dict.items():
             current_text = str(value)  # Conversion en string pour sécurité
 
-            # Remplacer les nombres
-            for cle, entities in entities_by_type.items():
-                for entity in entities:
-                    if cle == "PERSON":
-                        cleaned = entity.replace(" ", "_").replace("-", "_")  # Remplace espaces et tirets
-                        current_text = re.sub(
-                            r'(?<!\w)(' + re.escape(entity) + r')(?!\w)',
-                            f'++{cleaned}++',
-                            current_text,
-                            flags=re.IGNORECASE
-                        )
-                    elif cle == "LOC":
-                        cleaned = entity.replace(" ", "_").replace("-", "_")  # Remplace espaces et tirets
-                        current_text = re.sub(
-                            r'(?<!\w)(' + re.escape(entity) + r')(?!\w)',
-                            f'@@{cleaned}@@',
-                            current_text,
-                            flags=re.IGNORECASE
-                        )
-                    elif cle == "ORG":
-                        cleaned = entity.replace(" ", "_").replace("-", "_")  # Remplace espaces et tirets
-                        current_text = re.sub(
-                            r'(?<!\w)(' + re.escape(entity) + r')(?!\w)',
-                            f'┤┤{cleaned}┤┤',
-                            current_text,
-                            flags=re.IGNORECASE
-                        )
+            # === PERSON ===
+            for entity in entities_by_type.get("PERSON", []):
+                #Permet de lier les mots avec un espace ou un - pour qu'il n'apparaisse comme une seule entité lors de la detection des mots en gras
 
+                cleaned = entity.replace(" ", "_").replace("-", "_").replace(".", "\u00B7").replace("'", "\u02BC")
 
+                def replacer_person(match):
+                    found = match.group(1)
+                    insert_item(cleaned,"PERSON","findREN")
+                    return f'++{cleaned}++'
 
+                pattern = r'(?<!\w)(' + re.escape(entity) + r')(?!\w)'
+                current_text = re.sub(pattern, replacer_person, current_text, flags=re.IGNORECASE)
+
+            # === LOC ===
+            for entity in entities_by_type.get("LOC", []):
+                cleaned = entity.replace(" ", "_").replace("-", "_").replace(".", "\u00B7").replace("'", "\u02BC")
+
+                def replacer_loc(match):
+                    found = match.group(1)
+                    insert_item(cleaned,"LOC","findREN")
+                    return f'@@{cleaned}@@'
+
+                pattern = r'(?<!\w)(' + re.escape(entity) + r')(?!\w)'
+                current_text = re.sub(pattern, replacer_loc, current_text, flags=re.IGNORECASE)
+
+            # === ORG ===
+            for entity in entities_by_type.get("ORG", []):
+                cleaned = entity.replace(" ", "_").replace("-", "_").replace(".", "\u00B7").replace("'", "\u02BC")
+
+                def replacer_org(match):
+                    found = match.group(1)
+                    insert_item(cleaned,"ORG","findREN")
+                    return f'┤┤{cleaned}┤┤'
+
+                pattern = r'(?<!\w)(' + re.escape(entity) + r')(?!\w)'
+                current_text = re.sub(pattern, replacer_org, current_text, flags=re.IGNORECASE)
+
+            # === Nombres ===
             for num in nombres_str:
-                current_text = re.sub(
-                    r'(?<!\w)(' + re.escape(num) + r')(?!\w)',
-                    f'**\\1**',  # \\1 pour garder la casse originale
-                    current_text
-                )
+                pattern = r'(?<!\w)(' + re.escape(num) + r')(?!\w)'
 
-            # Remplacer les époques (insensible à la casse)
+                def replacer_num(match):
+                    found = match.group(1)
+                    insert_item(found,"Number","LLM")
+                    return f'**{found}**'
+
+                current_text = re.sub(pattern, replacer_num, current_text)
+
+            # === Époques ===
             for epoque in epoques_cible:
-                cleaned = epoque.replace(" ", "_").replace("-", "_")  # Remplace espaces et tirets
-                current_text = re.sub(
-                    r'(?<!\w)(' + re.escape(epoque) + r')(?!\w)',
-                    f'¦¦{cleaned}¦¦',
-                    current_text,
-                    flags=re.IGNORECASE
-                )
+                cleaned = epoque.replace(" ", "_").replace("-", "_")
+
+                def replacer_epoque(match):
+                    found = match.group(1)
+                    insert_item(cleaned,"Period","LLM")
+                    return f'¦¦{cleaned}¦¦'
+
+                pattern = r'(?<!\w)(' + re.escape(epoque) + r')(?!\w)'
+                current_text = re.sub(pattern, replacer_epoque, current_text, flags=re.IGNORECASE)
 
             # Mettre à jour la valeur dans le dict
             dict[key] = current_text
 
         return dict
+    def data_to_database(self,dict_nb, type,method):
+        for nb in dict_nb:
+            insert_item(str(nb), type, method)
+
+
 
 
     def replacenum(self, text: str, nombres_cibles,color: RGBColor,epoques_cible: List[str],output ):
@@ -372,11 +395,11 @@ class PDFTextProcessor:
                         #print(page)
                         #print(response)
                         annees_trouve = self.extraire_annees_historiques(response,epoques)
-                       # print(annees_trouve)
+                        print(annees_trouve)
                         self.compter_occurrences_manuel(annees_trouve, result)
                         if type(page) != list:
 
-                            findREN(page, self.entities_by_type)
+                            findREN(page, 0.80,self.entities_by_type)
 
 
                     else:
@@ -415,6 +438,8 @@ class PDFTextProcessor:
         # self.replacenum(self.dict_to_text(self.content),data_clear,RGBColor(255,0,0),self.periode_histo,output_path_cont)
         # self.replacenum(self.dict_to_text(self.foot_notes), data_clear_ftn, RGBColor(0, 0, 255), self.periode_histo_ftn, output_path_ftn )
         texte_clean = text_wo_footnotes(self.foot_notes,extraire_texte_pdf_par_page(input_path))
+       # self.data_to_database(self.data_clear,"Number","LLM")
+        #self.data_to_database(self.periode_histo,"period","LLM")
         self.app_content = self.number_to_bold(texte_clean, self.data_clear, self.entities_by_type, self.periode_histo)
 
 

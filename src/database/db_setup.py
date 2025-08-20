@@ -5,17 +5,38 @@ import os
 # Chemin de la base (dans le même dossier que ce fichier)
 DB_PATH = Path(__file__).parent / "data.db"
 
-def create_table():
+def create_tables():
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
 
+    # Table articles (sans auto-increment, juste int)
     cur.execute("""
-    CREATE TABLE IF NOT EXISTS items (
+    CREATE TABLE IF NOT EXISTS articles (
+        article_id INT PRIMARY KEY
+    )
+    """)
+
+    # Table des items (clé primaire composite : article_id + word + method)
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS item8s (
+        article_id INTEGER NOT NULL,
         word TEXT NOT NULL,
         type TEXT NOT NULL,
         method TEXT NOT NULL,
-        pertinence TEXT,                 -- colonne optionnelle
-        PRIMARY KEY (word, method)
+        pertinence TEXT,
+        PRIMARY KEY (article_id, word, method),
+        FOREIGN KEY (article_id) REFERENCES articles(article_id)
+    )
+    """)
+
+    # 🔥 Nouvelle table pour stocker le texte par page
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS pages (
+        article_id INTEGER NOT NULL,
+        page_number TEXT NOT NULL,
+        text TEXT,
+        PRIMARY KEY (article_id, page_number),
+        FOREIGN KEY (article_id) REFERENCES articles(article_id)
     )
     """)
 
@@ -23,15 +44,13 @@ def create_table():
     conn.close()
 
 def reset_database():
-    """Supprime la base et recrée la table vide."""
+    """Supprime la base et recrée les tables vides."""
     if DB_PATH.exists():
         os.remove(DB_PATH)
         print("💥 Base de données supprimée.")
 
-    create_table()
-    print("✅ Nouvelle base de données initialisée.")
+    create_tables()
+    print("✅ Nouvelles tables (articles + items + pages) initialisées.")
 
 if __name__ == "__main__":
-    # Exemple d'utilisation
-    # create_table()       # Juste créer si elle n'existe pas
-    reset_database()       # Supprimer et recréer
+    reset_database()

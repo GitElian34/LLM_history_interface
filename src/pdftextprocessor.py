@@ -14,7 +14,7 @@ from collections import *
 from appli_Demo import SearchApp
 from typing import Union, List, Tuple
 
-from src.database.db_insert import insert_item
+from src.database.db_insert import insert_item, insert_processed_text
 from src.database.db_query import *
 #from src.SQL.crud import *
 #from src.SQL.config import SessionLocal, get_db
@@ -218,94 +218,69 @@ class PDFTextProcessor:
             text += f"{page}:\n{content}\n\n"  # \n\n pour saut de ligne double entre pages
         return text.strip()  # .strip() pour supprimer le dernier \n inutile
 
-    def number_to_bold(self, dict, nombres_cibles, entities_by_type, epoques_cible: List[str], pattern=None):
+    import re
+    from typing import List
+
+    def extract_and_store(self, dict_, nombres_cibles, entities_by_type, epoques_cible: List[str], article_id, pattern=None):
         """
-        Entoure les nombres, entités et époques cibles avec des marqueurs spéciaux
-        dans les valeurs du dictionnaire, tout en affichant les correspondances trouvées.
+        Parcourt les textes dans le dictionnaire et insère en BDD les entités trouvées
+        (PERSON, LOC, ORG, nombres, époques), sans modifier le texte.
 
         Args:
-            dict: Dictionnaire contenant les valeurs à modifier
-            nombres_cibles: Liste de nombres à mettre en évidence
+            dict_: Dictionnaire contenant les valeurs à analyser
+            nombres_cibles: Liste de nombres à détecter
             entities_by_type: Dictionnaire contenant les entités classées par type (PERSON, LOC, ORG)
-            epoques_cible: Liste d'époques à mettre en évidence
-            pattern: Optionnel - motif regex prédéfini (non utilisé dans cette version)
+            epoques_cible: Liste d'époques à détecter
+            article_id: ID de l'article auquel rattacher les entités
+            pattern: Optionnel - motif regex prédéfini (non utilisé ici)
 
         Returns:
-            Le dictionnaire modifié
+            None (insertion uniquement en BDD)
         """
         # Convertir les nombres en strings une fois pour toutes
         nombres_str = list(map(str, nombres_cibles))
 
         # Traiter chaque valeur du dictionnaire
-        for key, value in dict.items():
-            current_text = str(value)  # Conversion en string pour sécurité
+        for key, value in dict_.items():
+            current_text = str(value)
 
             # === PERSON ===
             for entity in entities_by_type.get("PERSON", []):
-                #Permet de lier les mots avec un espace ou un - pour qu'il n'apparaisse comme une seule entité lors de la detection des mots en gras
-
                 cleaned = entity.replace(" ", "_").replace("-", "_").replace(".", "\u00B7").replace("'", "\u02BC")
 
-                def replacer_person(match):
-                    found = match.group(1)
-                    insert_item(cleaned,"PERSON","findREN")
-                    return f'++{cleaned}++'
-
                 pattern = r'(?<!\w)(' + re.escape(entity) + r')(?!\w)'
-                current_text = re.sub(pattern, replacer_person, current_text, flags=re.IGNORECASE)
+                if re.search(pattern, current_text, flags=re.IGNORECASE):
+                    insert_item(article_id, cleaned, "PERSON", "findREN")
 
             # === LOC ===
             for entity in entities_by_type.get("LOC", []):
                 cleaned = entity.replace(" ", "_").replace("-", "_").replace(".", "\u00B7").replace("'", "\u02BC")
 
-                def replacer_loc(match):
-                    found = match.group(1)
-                    insert_item(cleaned,"LOC","findREN")
-                    return f'@@{cleaned}@@'
-
                 pattern = r'(?<!\w)(' + re.escape(entity) + r')(?!\w)'
-                current_text = re.sub(pattern, replacer_loc, current_text, flags=re.IGNORECASE)
+                if re.search(pattern, current_text, flags=re.IGNORECASE):
+                    insert_item(article_id, cleaned, "LOC", "findREN")
 
             # === ORG ===
             for entity in entities_by_type.get("ORG", []):
                 cleaned = entity.replace(" ", "_").replace("-", "_").replace(".", "\u00B7").replace("'", "\u02BC")
 
-                def replacer_org(match):
-                    found = match.group(1)
-                    insert_item(cleaned,"ORG","findREN")
-                    return f'┤┤{cleaned}┤┤'
-
                 pattern = r'(?<!\w)(' + re.escape(entity) + r')(?!\w)'
-                current_text = re.sub(pattern, replacer_org, current_text, flags=re.IGNORECASE)
+                if re.search(pattern, current_text, flags=re.IGNORECASE):
+                    insert_item(article_id, cleaned, "ORG", "findREN")
 
             # === Nombres ===
             for num in nombres_str:
                 pattern = r'(?<!\w)(' + re.escape(num) + r')(?!\w)'
-
-                def replacer_num(match):
-                    found = match.group(1)
-                    insert_item(found,"Number","LLM")
-                    return f'**{found}**'
-
-                current_text = re.sub(pattern, replacer_num, current_text)
+                if re.search(pattern, current_text):
+                    insert_item(article_id, num, "Number", "LLM")
 
             # === Époques ===
             for epoque in epoques_cible:
                 cleaned = epoque.replace(" ", "_").replace("-", "_")
 
-                def replacer_epoque(match):
-                    found = match.group(1)
-                    insert_item(cleaned,"Period","LLM")
-                    return f'¦¦{cleaned}¦¦'
-
                 pattern = r'(?<!\w)(' + re.escape(epoque) + r')(?!\w)'
-                current_text = re.sub(pattern, replacer_epoque, current_text, flags=re.IGNORECASE)
-
-            # Mettre à jour la valeur dans le dict
-            dict[key] = current_text
-
-        return dict
-
+                if re.search(pattern, current_text, flags=re.IGNORECASE):
+                    insert_item(article_id, cleaned, "Period", "LLM")
 
     def number_to_bold_noDB(self, dict, nombres_cibles, entities_by_type, epoques_cible: List[str], pattern=None):
         """
@@ -388,12 +363,89 @@ class PDFTextProcessor:
 
         return dict
 
+    def number_to_bold_withDB(self, dict, article_id: int, nombres_cibles, entities_by_type, epoques_cible: List[str],
+                              pattern=None):
+        """
+        Met en évidence nombres, entités et époques dans les valeurs du dictionnaire
+        ET insère chaque élément dans la base de données.
 
-    def data_to_database(self,dict_nb, type,method):
-        for nb in dict_nb:
-            insert_item(str(nb), type, method)
+        Args:
+            dict: Dictionnaire contenant les valeurs à modifier
+            article_id: ID de l'article pour insertion en BDD
+            nombres_cibles: Liste de nombres à mettre en évidence
+            entities_by_type: Dictionnaire contenant les entités classées par type (PERSON, LOC, ORG)
+            epoques_cible: Liste d'époques à mettre en évidence
+            pattern: Optionnel - motif regex prédéfini (non utilisé ici)
 
+        Returns:
+            Le dictionnaire modifié
+        """
+        # Convertir les nombres en strings une fois pour toutes
+        nombres_str = list(map(str, nombres_cibles))
 
+        for key, value in dict.items():
+            current_text = str(value)  # Sécurité
+
+            # === PERSON ===
+            for entity in entities_by_type.get("PERSON", []):
+                cleaned = entity.replace(" ", "_").replace("-", "_").replace(".", "\u00B7").replace("'", "\u02BC")
+
+                def replacer_person(match):
+                    insert_item(article_id, entity, "PERSON", "highlight")  # insertion BDD
+                    return f'++{cleaned}++'
+
+                pattern = r'(?<!\w)(' + re.escape(entity) + r')(?!\w)'
+                current_text = re.sub(pattern, replacer_person, current_text, flags=re.IGNORECASE)
+
+            # === LOC ===
+            for entity in entities_by_type.get("LOC", []):
+                cleaned = entity.replace(" ", "_").replace("-", "_").replace(".", "\u00B7").replace("'", "\u02BC")
+
+                def replacer_loc(match):
+                    insert_item(article_id, entity, "LOC", "highlight")
+                    return f'@@{cleaned}@@'
+
+                pattern = r'(?<!\w)(' + re.escape(entity) + r')(?!\w)'
+                current_text = re.sub(pattern, replacer_loc, current_text, flags=re.IGNORECASE)
+
+            # === ORG ===
+            for entity in entities_by_type.get("ORG", []):
+                cleaned = entity.replace(" ", "_").replace("-", "_").replace(".", "\u00B7").replace("'", "\u02BC")
+
+                def replacer_org(match):
+                    insert_item(article_id, entity, "ORG", "highlight")
+                    return f'┤┤{cleaned}┤┤'
+
+                pattern = r'(?<!\w)(' + re.escape(entity) + r')(?!\w)'
+                current_text = re.sub(pattern, replacer_org, current_text, flags=re.IGNORECASE)
+
+            # === Nombres ===
+            for num in nombres_str:
+                pattern = r'(?<!\w)(' + re.escape(num) + r')(?!\w)'
+
+                def replacer_num(match):
+                    found = match.group(1)
+                    insert_item(article_id, found, "Number", "highlight")
+                    return f'**{found}**'
+
+                current_text = re.sub(pattern, replacer_num, current_text)
+
+            # === Époques ===
+            for epoque in epoques_cible:
+                cleaned = epoque.replace(" ", "_").replace("-", "_")
+
+                def replacer_epoque(match):
+                    found = match.group(1)
+                    insert_item(article_id, found, "Period", "highlight")
+                    return f'¦¦{cleaned}¦¦'
+
+                pattern = r'(?<!\w)(' + re.escape(epoque) + r')(?!\w)'
+                current_text = re.sub(pattern, replacer_epoque, current_text, flags=re.IGNORECASE)
+
+            # Mise à jour de la valeur dans le dict
+            dict[key] = current_text
+
+        return dict
 
 
     def replacenum(self, text: str, nombres_cibles,color: RGBColor,epoques_cible: List[str],output ):
@@ -493,9 +545,8 @@ class PDFTextProcessor:
         print("Fin du traitement")
 
 
-    def Test(self, iter:int, nbllm:int,seuil :int, question: str,input_path: str ):
+    def FillDB(self, iter:int, nbllm:int,seuil :int, question: str,input_path: str,article_id: int ):
         pdf_path = input_path
-        output_path = "C:/Users/elian/Documents/stage/Recherche/output/output.txt"
         print("DEBUT DU TEST")
         #content = self.pdftotext.clean_content
         self.content,self.foot_notes= process_pdf(pdf_path)
@@ -507,29 +558,20 @@ class PDFTextProcessor:
         self.getdataLLM(iter,self.foot_notes,1,self.periode_histo_ftn,question,self.ftn_year)
 
 
-        data_clear_ftn = self.clear_data(seuil,self.ftn_year)
-        #print(yearsdata)
-        #print(self.periode_histo)
-        output_path_cont = "C:/Users/elian/Documents/stage/Recherche/output/content_pdf.docx"
-        output_path_ftn = "C:/Users/elian/Documents/stage/Recherche/output/footnotes_pdf.docx"
-        # self.replacenum(self.dict_to_text(self.content),data_clear,RGBColor(255,0,0),self.periode_histo,output_path_cont)
-        # self.replacenum(self.dict_to_text(self.foot_notes), data_clear_ftn, RGBColor(0, 0, 255), self.periode_histo_ftn, output_path_ftn )
         self.texte_clean = text_wo_footnotes(self.foot_notes,extraire_texte_pdf_par_page(input_path))
-        print("le texte avant transformation est :")
-        print(self.texte_clean)
-       # self.data_to_database(self.data_clear,"Number","LLM")
-        #self.data_to_database(self.periode_histo,"period","LLM")
-        self.app_content = self.number_to_bold(self.texte_clean, self.data_clear, self.entities_by_type, self.periode_histo)
+        self.number_to_bold_withDB(self.texte_clean, article_id,self.data_clear, self.entities_by_type, self.periode_histo)
+        insert_processed_text(article_id,self.texte_clean)
 
-    def Test_with_BDD(self,pdf_path):
+
+    def Test_with_BDD(self,pdf_path,article_id):
 
         self.content, self.foot_notes = process_pdf(pdf_path)
         self.texte_clean = text_wo_footnotes(self.foot_notes, extraire_texte_pdf_par_page(pdf_path))
 
 
-        self.data_clear = get_numbers()
-        self.entities_by_type = get_entities()
-        self.periode_histo = get_epoques()
+        self.data_clear = get_numbers(article_id)
+        self.entities_by_type = get_entities(article_id)
+        self.periode_histo = get_epoques(article_id)
         self.app_content = self.number_to_bold_noDB(self.texte_clean, self.data_clear, self.entities_by_type, self.periode_histo)
 
 
@@ -573,13 +615,14 @@ if __name__ == "__main__":
         "- Inclure les années isolées ET les plages (ex: 1214-1322)\n\n")
     question6 = ("""Relève simplement tout ce qui pourrait s'apparenter à une année, nouvelle ou ancienne dans ce texte
     """)
-
-    #num_article=int(input("Choisis un article à transformer"))
-    PATH= "C:/Users/elian/Documents/stage/Recherche/pdf/1592.pdf"
+    article_id = 1586
+    PATH = "C:/Users/elian/Documents/stage/Recherche/pdf/"
+    article_PATH = f"{PATH}{article_id}.pdf"
     #article_path=PATH+str(num_article)+".pdf"
     #processor.Test(1, 1, 1, question4,PATH)
-    processor.Test_with_BDD(PATH)
+    processor.FillDB(1, 1, 1, question4,article_PATH,article_id)
+    #processor.Test_with_BDD(article_PATH,article_id)
     root = tk.Tk()
 
-    processor.interface_controller.launch_app(processor.app_content)
+    processor.interface_controller.launch_app(processor.app_content,article_id,data_processor=processor)
     root.mainloop()

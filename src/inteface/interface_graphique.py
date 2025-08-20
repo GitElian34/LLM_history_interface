@@ -2,16 +2,19 @@ import re
 
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QTextEdit, QVBoxLayout,
                              QWidget, QPushButton, QHBoxLayout, QToolTip, QDialog, QLabel, QCheckBox, QRadioButton,
-                             QButtonGroup)
+                             QButtonGroup, QComboBox)
 from PyQt6.QtGui import QFont, QTextCharFormat
 from PyQt6.QtCore import Qt
 
 from src.database.db_insert import update_pertinence
+from src.database.db_query import get_all_articles
 
 
 class MultiPageTextApp(QMainWindow):
-    def __init__(self, pages=None,):
+    def __init__(self, article_id, pages = None,data_processor = None, controller=None):
         super().__init__()
+        self.data_processor = data_processor
+        self.controller = controller  # référence au controller
         self.setWindowTitle("Interface Graphique")
         self.resize(800, 600)
         self.current_page = 0  # Page actuelle
@@ -22,8 +25,18 @@ class MultiPageTextApp(QMainWindow):
         self.setCentralWidget(central_widget)
         main_layout = QVBoxLayout(central_widget)
 
+        top_layout = QHBoxLayout()
+        self.article_combo = QComboBox()
+        self.article_combo.addItems([str(a) for a in get_all_articles()])  # liste des articles
+        self.article_combo.setCurrentText(str(article_id))
+        self.article_combo.currentIndexChanged.connect(self.change_selected_article)
+        top_layout.addWidget(self.article_combo)
+        main_layout.addLayout(top_layout)
+
+
+
         # Zone de texte
-        self.text_edit = HoverTextEdit(self.pages,self.current_page)
+        self.text_edit = HoverTextEdit(self.pages,article_id,self.current_page)
         self.text_edit.setReadOnly(True)
         self.text_edit.setFont(QFont("Georgia", 12))
         self.text_edit.setAttribute(Qt.WidgetAttribute.WA_AlwaysShowToolTips)
@@ -57,6 +70,20 @@ class MultiPageTextApp(QMainWindow):
 
         # Afficher la première page
         self.display_page()
+
+    def change_selected_article(self):
+        selected_article = self.article_combo.currentText()
+        print(f"Article sélectionné : {selected_article}")
+        PATH = "C:/Users/elian/Documents/stage/Recherche/pdf/"
+        article_PATH = f"{PATH}{selected_article}.pdf"
+        if self.controller is not None:
+            # Récupère le contenu du nouvel article depuis ta DB ou autre
+            content = self.data_processor.Test_with_BDD(article_PATH,selected_article)  # à adapter selon ta fonction
+            # Met à jour les pages via le controller
+           # self.controller.pagetoIG(content)
+            # Recharge les pages dans l'interface
+           # self.current_page = 0
+           # self.display_page()
 
     def refresh_current_page(self):
         """Recharge la page actuelle"""
@@ -127,6 +154,7 @@ class MultiPageTextApp(QMainWindow):
 
 class TextAppController:
     def __init__(self):
+        self.data_processor = None
         self.pages = [
             # Votre contenu initial des pages ici
             """<h1 style="color: #2c3e50; text-align: center;">Page 1</h1>...""",
@@ -153,8 +181,9 @@ class TextAppController:
                 num_page += 1
 
 
-    def launch_app(self,content):
+    def launch_app(self,content,article_id,data_processor=None):
         """Lance l'application graphique"""
+        self.data_processor = data_processor
         if QApplication.instance() is None:
             self.app = QApplication([])
         else:
@@ -166,7 +195,7 @@ class TextAppController:
             # Optionnel : utiliser les réponses si besoin plus tard
             print("Choix utilisateur :", startup_dialog.box_choices)
         self.pagetoIG(content)
-        self.window = MultiPageTextApp(self.pages)
+        self.window = MultiPageTextApp(article_id, self.pages, data_processor=self.data_processor,controller=self)
         self.window.show()
         self.app.exec()
 
@@ -307,7 +336,7 @@ class StartupDialog(QDialog):
 
 
 class PopUpDialog(QDialog):
-    def __init__(self, mot, choices, question,color, checked_words,parent=None):
+    def __init__(self, mot, choices, question,color, checked_words,article_id,parent=None):
         """
         :param mot: Le mot ciblé pour contextualiser la question
         :param choices: Liste de chaînes représentant les choix (ex: ["Clairement Oui", "Plutôt Oui", ...])
@@ -315,6 +344,7 @@ class PopUpDialog(QDialog):
         :param parent: Parent Qt (optionnel)
         """
         super().__init__(parent)
+        self.article_id = article_id
         self.color = color
         self.setWindowTitle(f"Choix pour : {mot}")
         self.setFixedSize(350, 150 + 30 * len(choices))
@@ -343,9 +373,9 @@ class PopUpDialog(QDialog):
         selected_id = self.button_group.checkedId()
         if selected_id != -1:
             if self.color =="#000000" :
-                update_pertinence(self.mot,"LLM",self.radio_buttons[selected_id].text())
+                update_pertinence(self.mot,"LLM",self.radio_buttons[selected_id].text(),self.article_id)
             else :
-                update_pertinence(self.mot,"findREN",self.radio_buttons[selected_id].text())
+                update_pertinence(self.mot,"findREN",self.radio_buttons[selected_id].text(),self.article_id)
 
         self.accept()
 
@@ -354,12 +384,12 @@ class PopUpDialog(QDialog):
 
 
 class HoverTextEdit(QTextEdit):
-    def __init__(self,pages,current_pages, *args, **kwargs):
+    def __init__(self,pages,article_id,current_pages, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.reponses_utilisateur = {}  # Pour stocker les réponses
         self.pages = pages
         self.current_pages = current_pages
-
+        self.article_id = article_id
 
 
     def remplacer_balise(self, mot, nouveau_html):
@@ -423,7 +453,8 @@ class HoverTextEdit(QTextEdit):
                     choices=choices,
                     question=question,
                     color=color,
-                    checked_words =self.reponses_utilisateur
+                    checked_words =self.reponses_utilisateur,
+                    article_id= self.article_id,
                 )
 
                 if dialog.exec():

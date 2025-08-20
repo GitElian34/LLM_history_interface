@@ -10,13 +10,11 @@ from src.database.db_insert import update_pertinence
 
 
 class MultiPageTextApp(QMainWindow):
-    def __init__(self,bold_number,bold_names, pages=None,):
+    def __init__(self, pages=None,):
         super().__init__()
         self.setWindowTitle("Interface Graphique")
         self.resize(800, 600)
         self.current_page = 0  # Page actuelle
-        self.bold_number = bold_number
-        self.bold_names = bold_names
         # Contenu des pages (peut être chargé depuis un fichier)
         self.pages = pages if pages is not None else []
         # Widget central et layout principal
@@ -25,7 +23,7 @@ class MultiPageTextApp(QMainWindow):
         main_layout = QVBoxLayout(central_widget)
 
         # Zone de texte
-        self.text_edit = HoverTextEdit(bold_number,bold_names,self.pages,self.current_page)
+        self.text_edit = HoverTextEdit(self.pages,self.current_page)
         self.text_edit.setReadOnly(True)
         self.text_edit.setFont(QFont("Georgia", 12))
         self.text_edit.setAttribute(Qt.WidgetAttribute.WA_AlwaysShowToolTips)
@@ -155,7 +153,7 @@ class TextAppController:
                 num_page += 1
 
 
-    def launch_app(self,bold_number,bold_names,content):
+    def launch_app(self,content):
         """Lance l'application graphique"""
         if QApplication.instance() is None:
             self.app = QApplication([])
@@ -168,7 +166,7 @@ class TextAppController:
             # Optionnel : utiliser les réponses si besoin plus tard
             print("Choix utilisateur :", startup_dialog.box_choices)
         self.pagetoIG(content)
-        self.window = MultiPageTextApp(bold_number,bold_names,self.pages)
+        self.window = MultiPageTextApp(self.pages)
         self.window.show()
         self.app.exec()
 
@@ -356,10 +354,8 @@ class PopUpDialog(QDialog):
 
 
 class HoverTextEdit(QTextEdit):
-    def __init__(self, bold_number, bold_names,pages,current_pages, *args, **kwargs):
+    def __init__(self,pages,current_pages, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.bold_number = bold_number
-        self.bold_names = bold_names
         self.reponses_utilisateur = {}  # Pour stocker les réponses
         self.pages = pages
         self.current_pages = current_pages

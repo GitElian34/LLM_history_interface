@@ -15,6 +15,7 @@ from appli_Demo import SearchApp
 from typing import Union, List, Tuple
 
 from src.database.db_insert import insert_item
+from src.database.db_query import *
 #from src.SQL.crud import *
 #from src.SQL.config import SessionLocal, get_db
 #from src.SQL.main import init_db
@@ -38,6 +39,7 @@ class PDFTextProcessor:
         'LOC': [],
         'ORG': []
     }
+        self.text_clean = None
         self.app_content = None
         self.pdftotext = None
         self.content = None
@@ -303,6 +305,90 @@ class PDFTextProcessor:
             dict[key] = current_text
 
         return dict
+
+
+    def number_to_bold_noDB(self, dict, nombres_cibles, entities_by_type, epoques_cible: List[str], pattern=None):
+        """
+        Identique à number_to_bold mais sans insertion en base de données.
+        Met en évidence nombres, entités et époques dans les valeurs du dictionnaire.
+
+        Args:
+            dict: Dictionnaire contenant les valeurs à modifier
+            nombres_cibles: Liste de nombres à mettre en évidence
+            entities_by_type: Dictionnaire contenant les entités classées par type (PERSON, LOC, ORG)
+            epoques_cible: Liste d'époques à mettre en évidence
+            pattern: Optionnel - motif regex prédéfini (non utilisé dans cette version)
+
+        Returns:
+            Le dictionnaire modifié
+        """
+        # Convertir les nombres en strings une fois pour toutes
+        nombres_str = list(map(str, nombres_cibles))
+
+        # Traiter chaque valeur du dictionnaire
+        for key, value in dict.items():
+            current_text = str(value)  # Conversion en string pour sécurité
+
+            # === PERSON ===
+            for entity in entities_by_type.get("PERSON", []):
+                cleaned = entity.replace(" ", "_").replace("-", "_").replace(".", "\u00B7").replace("'", "\u02BC")
+
+                def replacer_person(match):
+                    found = match.group(1)
+                    return f'++{cleaned}++'
+
+                pattern = r'(?<!\w)(' + re.escape(entity) + r')(?!\w)'
+                current_text = re.sub(pattern, replacer_person, current_text, flags=re.IGNORECASE)
+
+            # === LOC ===
+            for entity in entities_by_type.get("LOC", []):
+                cleaned = entity.replace(" ", "_").replace("-", "_").replace(".", "\u00B7").replace("'", "\u02BC")
+
+                def replacer_loc(match):
+                    found = match.group(1)
+                    return f'@@{cleaned}@@'
+
+                pattern = r'(?<!\w)(' + re.escape(entity) + r')(?!\w)'
+                current_text = re.sub(pattern, replacer_loc, current_text, flags=re.IGNORECASE)
+
+            # === ORG ===
+            for entity in entities_by_type.get("ORG", []):
+                cleaned = entity.replace(" ", "_").replace("-", "_").replace(".", "\u00B7").replace("'", "\u02BC")
+
+                def replacer_org(match):
+                    found = match.group(1)
+                    return f'┤┤{cleaned}┤┤'
+
+                pattern = r'(?<!\w)(' + re.escape(entity) + r')(?!\w)'
+                current_text = re.sub(pattern, replacer_org, current_text, flags=re.IGNORECASE)
+
+            # === Nombres ===
+            for num in nombres_str:
+                pattern = r'(?<!\w)(' + re.escape(num) + r')(?!\w)'
+
+                def replacer_num(match):
+                    found = match.group(1)
+                    return f'**{found}**'
+
+                current_text = re.sub(pattern, replacer_num, current_text)
+
+            # === Époques ===
+            for epoque in epoques_cible:
+                cleaned = epoque.replace(" ", "_").replace("-", "_")
+
+                def replacer_epoque(match):
+                    found = match.group(1)
+                    return f'¦¦{cleaned}¦¦'
+
+                pattern = r'(?<!\w)(' + re.escape(epoque) + r')(?!\w)'
+                current_text = re.sub(pattern, replacer_epoque, current_text, flags=re.IGNORECASE)
+
+            # Mettre à jour la valeur dans le dict
+            dict[key] = current_text
+
+        return dict
+
+
     def data_to_database(self,dict_nb, type,method):
         for nb in dict_nb:
             insert_item(str(nb), type, method)
@@ -406,15 +492,6 @@ class PDFTextProcessor:
                         print("Le traitement a échoué.")
         print("Fin du traitement")
 
-    def pagetoIG(self,content):
-
-        num_page = 0
-        for page in content.values():
-            if type(page) != list:
-                self.interface_controller.update_page(page_number=num_page, raw_text=page)
-                num_page += 1
-
-
 
     def Test(self, iter:int, nbllm:int,seuil :int, question: str,input_path: str ):
         pdf_path = input_path
@@ -437,49 +514,24 @@ class PDFTextProcessor:
         output_path_ftn = "C:/Users/elian/Documents/stage/Recherche/output/footnotes_pdf.docx"
         # self.replacenum(self.dict_to_text(self.content),data_clear,RGBColor(255,0,0),self.periode_histo,output_path_cont)
         # self.replacenum(self.dict_to_text(self.foot_notes), data_clear_ftn, RGBColor(0, 0, 255), self.periode_histo_ftn, output_path_ftn )
-        texte_clean = text_wo_footnotes(self.foot_notes,extraire_texte_pdf_par_page(input_path))
+        self.texte_clean = text_wo_footnotes(self.foot_notes,extraire_texte_pdf_par_page(input_path))
+        print("le texte avant transformation est :")
+        print(self.texte_clean)
        # self.data_to_database(self.data_clear,"Number","LLM")
         #self.data_to_database(self.periode_histo,"period","LLM")
-        self.app_content = self.number_to_bold(texte_clean, self.data_clear, self.entities_by_type, self.periode_histo)
+        self.app_content = self.number_to_bold(self.texte_clean, self.data_clear, self.entities_by_type, self.periode_histo)
+
+    def Test_with_BDD(self,pdf_path):
+
+        self.content, self.foot_notes = process_pdf(pdf_path)
+        self.texte_clean = text_wo_footnotes(self.foot_notes, extraire_texte_pdf_par_page(pdf_path))
 
 
-        # print("-------------------CONTENT-----------------\n")
-        # print(self.dict_to_text(self.content))
-        # print("-------------------FOOTNOTES-----------------\n")
-        # print(self.dict_to_text(self.foot_notes))
-        # # print("-------------------ENTITIES-----------------\n")
-        # print(self.dict_to_text(self.foot_notes))
-        # print("=== Personnages ===")
-        # print("\n".join(set(self.entities_by_type['PERSON'])))  # set() pour éliminer les doublons
-        # print("\n=== Lieux ===")
-        # print("\n".join(set(self.entities_by_type['LOC'])))
-        # print("\n=== Autres entités ===")
-        # print("\n".join(set(self.entities_by_type['OTHER'])))
+        self.data_clear = get_numbers()
+        self.entities_by_type = get_entities()
+        self.periode_histo = get_epoques()
+        self.app_content = self.number_to_bold_noDB(self.texte_clean, self.data_clear, self.entities_by_type, self.periode_histo)
 
-        # self.initdatabase()
-        # try:
-        #     # Vérifie d'abord si l'entrée existe déjà
-        #     existing_entry = get_entry_by_id(self.db, 1588)
-        #
-        #     if existing_entry:
-        #         print("Mise à jour de l'entrée existante")
-        #         existing_entry.nombres = str(data_clear)  # Mise à jour des données
-        #     else:
-        #         print("Création d'une nouvelle entrée")
-        #         create_entry(self.db, 1588, data_clear)
-        #
-        #     self.db.commit()
-        #     print("Données sauvegardées avec succès")
-        #
-        # except IntegrityError as e:
-        #     self.db.rollback()
-        #     print(f"Erreur d'intégrité: {str(e)}")
-        # except Exception as e:
-        #     self.db.rollback()
-        #     print(f"Erreur inattendue: {str(e)}")
-        # finally:
-        #
-        #     self.db.close()
 
 if __name__ == "__main__":
     print("début du programme")
@@ -525,8 +577,9 @@ if __name__ == "__main__":
     #num_article=int(input("Choisis un article à transformer"))
     PATH= "C:/Users/elian/Documents/stage/Recherche/pdf/1592.pdf"
     #article_path=PATH+str(num_article)+".pdf"
-    processor.Test(1, 1, 1, question4,PATH)
+    #processor.Test(1, 1, 1, question4,PATH)
+    processor.Test_with_BDD(PATH)
     root = tk.Tk()
 
-    processor.interface_controller.launch_app(processor.data_clear,processor.periode_histo,processor.app_content)
+    processor.interface_controller.launch_app(processor.app_content)
     root.mainloop()

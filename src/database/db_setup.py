@@ -18,7 +18,7 @@ def create_tables():
 
     # Table des items (clé primaire composite : article_id + word + method)
     cur.execute("""
-    CREATE TABLE IF NOT EXISTS item8s (
+    CREATE TABLE IF NOT EXISTS items (
         article_id INTEGER NOT NULL,
         word TEXT NOT NULL,
         type TEXT NOT NULL,

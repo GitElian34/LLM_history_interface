@@ -14,7 +14,7 @@ from collections import *
 from appli_Demo import SearchApp
 from typing import Union, List, Tuple
 
-from src.database.db_insert import insert_item, insert_processed_text
+from src.database.db_insert import *
 from src.database.db_query import *
 #from src.SQL.crud import *
 #from src.SQL.config import SessionLocal, get_db
@@ -559,8 +559,8 @@ class PDFTextProcessor:
 
 
         self.texte_clean = text_wo_footnotes(self.foot_notes,extraire_texte_pdf_par_page(input_path))
-        self.number_to_bold_withDB(self.texte_clean, article_id,self.data_clear, self.entities_by_type, self.periode_histo)
-        insert_processed_text(article_id,self.texte_clean)
+        insert_pages_dict(article_id,self.number_to_bold_withDB(self.texte_clean, article_id,self.data_clear, self.entities_by_type, self.periode_histo))
+
 
 
     def Test_with_BDD(self,pdf_path,article_id):
@@ -572,7 +572,9 @@ class PDFTextProcessor:
         self.data_clear = get_numbers(article_id)
         self.entities_by_type = get_entities(article_id)
         self.periode_histo = get_epoques(article_id)
-        self.app_content = self.number_to_bold_noDB(self.texte_clean, self.data_clear, self.entities_by_type, self.periode_histo)
+        self.app_content = get_article_pages(article_id)
+        print("APP CONTENT /  :")
+        print(self.app_content)
 
 
 if __name__ == "__main__":
@@ -615,14 +617,14 @@ if __name__ == "__main__":
         "- Inclure les années isolées ET les plages (ex: 1214-1322)\n\n")
     question6 = ("""Relève simplement tout ce qui pourrait s'apparenter à une année, nouvelle ou ancienne dans ce texte
     """)
-    article_id = 1586
+    article_id = 1601
     PATH = "C:/Users/elian/Documents/stage/Recherche/pdf/"
     article_PATH = f"{PATH}{article_id}.pdf"
     #article_path=PATH+str(num_article)+".pdf"
     #processor.Test(1, 1, 1, question4,PATH)
     processor.FillDB(1, 1, 1, question4,article_PATH,article_id)
     #processor.Test_with_BDD(article_PATH,article_id)
-    root = tk.Tk()
-
-    processor.interface_controller.launch_app(processor.app_content,article_id,data_processor=processor)
-    root.mainloop()
+    # root = tk.Tk()
+    #
+    # processor.interface_controller.launch_app(processor.app_content,article_id,data_processor=processor)
+    # root.mainloop()

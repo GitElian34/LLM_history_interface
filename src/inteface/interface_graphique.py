@@ -7,7 +7,7 @@ from PyQt6.QtGui import QFont, QTextCharFormat
 from PyQt6.QtCore import Qt
 
 from src.database.db_insert import update_pertinence
-from src.database.db_query import get_all_articles
+from src.database.db_query import get_all_articles, get_article_pages
 
 
 class MultiPageTextApp(QMainWindow):
@@ -74,16 +74,21 @@ class MultiPageTextApp(QMainWindow):
     def change_selected_article(self):
         selected_article = self.article_combo.currentText()
         print(f"Article sélectionné : {selected_article}")
-        PATH = "C:/Users/elian/Documents/stage/Recherche/pdf/"
-        article_PATH = f"{PATH}{selected_article}.pdf"
-        if self.controller is not None:
-            # Récupère le contenu du nouvel article depuis ta DB ou autre
-            content = self.data_processor.Test_with_BDD(article_PATH,selected_article)  # à adapter selon ta fonction
-            # Met à jour les pages via le controller
-           # self.controller.pagetoIG(content)
-            # Recharge les pages dans l'interface
-           # self.current_page = 0
-           # self.display_page()
+        new_article =get_article_pages(selected_article)
+        self.controller.pagetoIG(new_article)
+        #self.controller.pagetoIG(get_article_pages(selected_article))
+        self.current_page = 0
+        self.display_page()
+        # PATH = "C:/Users/elian/Documents/stage/Recherche/pdf/"
+        # article_PATH = f"{PATH}{selected_article}.pdf"
+        # if self.controller is not None:
+        #     # Récupère le contenu du nouvel article depuis ta DB ou autre
+        #     content = self.data_processor.Test_with_BDD(article_PATH,selected_article)  # à adapter selon ta fonction
+        #     # Met à jour les pages via le controller
+        #    # self.controller.pagetoIG(content)
+        #     # Recharge les pages dans l'interface
+        #    # self.current_page = 0
+        #    # self.display_page()
 
     def refresh_current_page(self):
         """Recharge la page actuelle"""
@@ -174,8 +179,10 @@ class TextAppController:
 
     def pagetoIG(self,content):
 
+
         num_page = 0
         for page in content.values():
+            print(num_page)
             if type(page) != list:
                 self.update_page(page_number=num_page, raw_text=page)
                 num_page += 1
@@ -200,6 +207,7 @@ class TextAppController:
         self.app.exec()
 
     def update_page(self, page_number: int, raw_text: str):
+
         """Met à jour une page sans lancer l'interface"""
         if page_number >= len(self.pages):
             self.pages.append("")
@@ -277,7 +285,6 @@ class TextAppController:
                 formatted_text
             )
 
-
         # Met en italique les notes entre <ftn> <ftn>
         formatted_text = re.sub(
             r'<ftn>(.*?)<ftn>',
@@ -297,8 +304,8 @@ class TextAppController:
         """
 
         # Met à jour l'affichage si interface ouverte
-        if self.window is not None:
-            self.window.update_page(page_number, raw_text)
+
+
 
 
 class StartupDialog(QDialog):
@@ -467,11 +474,9 @@ class HoverTextEdit(QTextEdit):
 
 if __name__ == "__main__":
     controller = TextAppController()
-
+    article_id=1592
     # Modifier les pages sans lancer l'interface
-    controller.update_page(0, "Nouveau contenu pour la page 1")
-    controller.update_page(3, "Contenu pour une nouvelle page 4")
 
     # Lancer l'interface quand vous le souhaitez
-    controller.launch_app()
+    controller.launch_app(get_article_pages(article_id),article_id,data_processor=None)
 

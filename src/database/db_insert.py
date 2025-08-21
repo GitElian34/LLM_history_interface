@@ -40,24 +40,34 @@ def update_pertinence(article_id, word, method, pertinence):
     conn.close()
 
 # 🔥 Insérer/mettre à jour le texte d’une page
-def insert_page_text(article_id, page_number, text):
+def insert_pages_dict(article_id, pages_dict: dict):
+    """
+    Insère ou met à jour toutes les pages d'un article à partir d'un dictionnaire.
+
+    Args:
+        article_id (int): ID de l'article.
+        pages_dict (dict): Dictionnaire {page_number: texte}
+    """
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
+
+    # Vérifier si l'article existe
     cur.execute("SELECT 1 FROM articles WHERE article_id = ?", (article_id,))
     if cur.fetchone() is None:
         cur.execute("INSERT INTO articles (article_id) VALUES (?)", (article_id,))
         print(f"📄 Nouvel article ajouté : {article_id}")
 
-    cur.execute("""
-    INSERT INTO pages (article_id, page_number, text)
-    VALUES (?, ?, ?)
-    ON CONFLICT(article_id, page_number) DO UPDATE SET text = excluded.text
-    """, (article_id, page_number, text))
+    # Insérer chaque page du dictionnaire
+    for page_number, text in pages_dict.items():
+        cur.execute("""
+        INSERT INTO pages (article_id, page_number, text)
+        VALUES (?, ?, ?)
+        ON CONFLICT(article_id, page_number) DO UPDATE SET text = excluded.text
+        """, (article_id, page_number, text))
+        print(f"✅ Texte enregistré pour article {article_id}, page {page_number}")
+
     conn.commit()
     conn.close()
-    print(f"✅ Texte enregistré pour article {article_id}, page {page_number}")
 
 if __name__ == "__main__":
     insert_item(1, "chat", "animal", "analyse_textuelle", pertinence="moyenne")
-    insert_page_text(1, 1, "Ceci est le texte de la page 1")
-    insert_page_text(1, 2, "Ceci est le texte de la page 2")

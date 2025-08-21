@@ -118,15 +118,15 @@ def findREN(text: str,threshold : float, entities_by_type: Dict[str, List[str]])
 
             print(f"Trouvé: {entity_text} | Label: {entity_label} | Confiance: {confidence:.2f}")
 
-            if entity_label == 'PER' and confidence > threshold:
+            if entity_label == 'PER' and confidence > threshold and len(entity_text)>2:
                 entities_by_type['PERSON'].append(entity_text)
                 methods_grade["findREN"][1] += 1
                # insert_item(normalized_word, "PERSON", "findREN", pertinence=f"{confidence:.2f}")
-            elif entity_label in ['LOC', 'GPE'] and confidence > threshold:
+            elif entity_label in ['LOC', 'GPE'] and confidence > threshold and len(entity_text)>2:
                 entities_by_type['LOC'].append(entity_text)
                 methods_grade["findREN"][1] += 1
                 #insert_item(normalized_word, "LOC", "findREN", pertinence=f"{confidence:.2f}")
-            elif entity_label == 'ORG' and confidence > threshold:
+            elif entity_label == 'ORG' and confidence > threshold and len(entity_text)>2 :
                 entities_by_type['ORG'].append(entity_text)
                 methods_grade["findREN"][1] += 1
                 #insert_item(normalized_word, "ORG", "findREN", pertinence=f"{confidence:.2f}")

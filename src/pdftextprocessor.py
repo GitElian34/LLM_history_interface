@@ -1,3 +1,4 @@
+import os
 from sqlite3 import IntegrityError
 
 import requests
@@ -391,7 +392,7 @@ class PDFTextProcessor:
                 cleaned = entity.replace(" ", "_").replace("-", "_").replace(".", "\u00B7").replace("'", "\u02BC")
 
                 def replacer_person(match):
-                    insert_item(article_id, entity, "PERSON", "highlight")  # insertion BDD
+                    insert_item(article_id, cleaned, "PERSON", "highlight")  # insertion BDD
                     return f'++{cleaned}++'
 
                 pattern = r'(?<!\w)(' + re.escape(entity) + r')(?!\w)'
@@ -402,7 +403,7 @@ class PDFTextProcessor:
                 cleaned = entity.replace(" ", "_").replace("-", "_").replace(".", "\u00B7").replace("'", "\u02BC")
 
                 def replacer_loc(match):
-                    insert_item(article_id, entity, "LOC", "highlight")
+                    insert_item(article_id, cleaned, "LOC", "highlight")
                     return f'@@{cleaned}@@'
 
                 pattern = r'(?<!\w)(' + re.escape(entity) + r')(?!\w)'
@@ -413,7 +414,7 @@ class PDFTextProcessor:
                 cleaned = entity.replace(" ", "_").replace("-", "_").replace(".", "\u00B7").replace("'", "\u02BC")
 
                 def replacer_org(match):
-                    insert_item(article_id, entity, "ORG", "highlight")
+                    insert_item(article_id, cleaned, "ORG", "highlight")
                     return f'┤┤{cleaned}┤┤'
 
                 pattern = r'(?<!\w)(' + re.escape(entity) + r')(?!\w)'
@@ -515,6 +516,18 @@ class PDFTextProcessor:
     #     """Initialise la base de données sans supprimer les entrées existantes"""
     #     init_db()  # S'assure que les tables existent
     #     self.db = next(get_db())
+    def get_all_pdfs(self,folder_path: str):
+        """
+        Parcourt un dossier et retourne la liste des fichiers PDF (sans extension).
+        """
+        pdf_files = []
+        for file in os.listdir(folder_path):
+            if file.lower().endswith(".pdf"):
+                # on enlève l'extension pour ne garder que le "nom"
+                pdf_files.append(os.path.splitext(file)[0])
+        return pdf_files
+
+
     def getdataLLM(self,iter:int,contenu , nbllm:int,epoques, question: str, result ):
         contexte = ("Mon objectif est de prendre un pdf et de mettre en avant toutes"
                     "les dates et périodes historiques en les mettants en gras et plus gros"
@@ -617,12 +630,15 @@ if __name__ == "__main__":
         "- Inclure les années isolées ET les plages (ex: 1214-1322)\n\n")
     question6 = ("""Relève simplement tout ce qui pourrait s'apparenter à une année, nouvelle ou ancienne dans ce texte
     """)
-    article_id = 1601
+
+    article_id = 1592
     PATH = "C:/Users/elian/Documents/stage/Recherche/pdf/"
     article_PATH = f"{PATH}{article_id}.pdf"
     #article_path=PATH+str(num_article)+".pdf"
+
     #processor.Test(1, 1, 1, question4,PATH)
-    processor.FillDB(1, 1, 1, question4,article_PATH,article_id)
+    #processor.FillDB(1, 1, 1, question4,article_PATH,article_id)
+    #print(get_precision(article_id,"LOC"))
     #processor.Test_with_BDD(article_PATH,article_id)
     # root = tk.Tk()
     #

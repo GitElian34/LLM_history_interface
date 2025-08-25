@@ -2,11 +2,11 @@ import re
 
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QTextEdit, QVBoxLayout,
                              QWidget, QPushButton, QHBoxLayout, QToolTip, QDialog, QLabel, QCheckBox, QRadioButton,
-                             QButtonGroup, QComboBox)
+                             QButtonGroup, QComboBox, QLineEdit, QDialogButtonBox)
 from PyQt6.QtGui import QFont, QTextCharFormat
 from PyQt6.QtCore import Qt
 
-from src.database.db_insert import update_pertinence
+from src.database.db_insert import update_pertinence, insert_item
 from src.database.db_query import get_all_articles, get_article_pages
 
 
@@ -33,6 +33,10 @@ class MultiPageTextApp(QMainWindow):
         top_layout.addWidget(self.article_combo)
         main_layout.addLayout(top_layout)
 
+        self.add_button = QPushButton("Ajouter")
+        self.add_button.clicked.connect(self.open_add_word_dialog)
+
+        top_layout.addWidget(self.add_button)
 
 
         # Zone de texte
@@ -135,6 +139,14 @@ class MultiPageTextApp(QMainWindow):
         if self.current_page < len(self.pages) - 1:
             self.current_page += 1
             self.display_page()
+
+
+    def open_add_word_dialog(self):
+        print("Ajouter")
+        dialog = AddWordDialog()
+        print("1")
+        dialog.exec()
+
 
     # def update_page(self, page_number: int, raw_text: str):
     #     if page_number >= len(self.pages):
@@ -380,15 +392,64 @@ class PopUpDialog(QDialog):
         selected_id = self.button_group.checkedId()
         if selected_id != -1:
             if self.color =="#000000" :
-                update_pertinence(self.mot,"LLM",self.radio_buttons[selected_id].text(),self.article_id)
+                update_pertinence(self.article_id,self.mot,"highlight",self.radio_buttons[selected_id].text())
             else :
-                update_pertinence(self.mot,"findREN",self.radio_buttons[selected_id].text(),self.article_id)
+                update_pertinence(self.article_id,self.mot,"highlight",self.radio_buttons[selected_id].text())
 
         self.accept()
 
 
 
+class AddWordDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Ajouter un mot")
+        print("1")
+        layout = QVBoxLayout()
 
+        # Champ mot
+        word_layout = QHBoxLayout()
+        word_layout.addWidget(QLabel("Mot :"))
+        self.word_input = QLineEdit()
+        word_layout.addWidget(self.word_input)
+        layout.addLayout(word_layout)
+        print("1")
+        # Champ catégorie
+        cat_layout = QHBoxLayout()
+        cat_layout.addWidget(QLabel("Catégorie :"))
+        self.category_combo = QComboBox()
+        self.category_combo.addItems(["LOC", "PERSON", "ORG", "Number", "Period"])
+        cat_layout.addWidget(self.category_combo)
+        layout.addLayout(cat_layout)
+        print("1")
+        # Boutons OK / Annuler
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok)
+        buttons.accepted.connect(self.add_word)
+        layout.addWidget(buttons)
+        print("1")
+        self.setLayout(layout)
+
+    def reject(self):
+        """Ferme simplement la popup quand on clique sur Annuler"""
+        self.close()
+
+
+    def add_word(self):
+        word = self.word_input.text().strip()
+        category = self.category_combo.currentText()
+
+        if not word or not article_id:
+            print("⚠ Aucun mot ou article sélectionné.")
+            return
+
+        # Appeler le contrôleur (qui lui-même insère en base)
+        print(f"✅ Mot ajouté : {word} ({category}) dans article {article_id}")
+        insert_item(article_id, word,category,"Manuellement")
+        self.word_input.clear()
+
+    def get_data(self):
+        """Renvoie le mot et la catégorie choisis"""
+        return self.word_input.text(), self.category_combo.currentText()
 
 class HoverTextEdit(QTextEdit):
     def __init__(self,pages,article_id,current_pages, *args, **kwargs):
@@ -438,17 +499,17 @@ class HoverTextEdit(QTextEdit):
             if is_bold and word not in self.reponses_utilisateur:
                 # Choix en fonction de la couleur
                 if color == "#ff0000":  # rouge
-                    question = "Ce mot en rouge est-il une date importante ?"
-                    choices = ["Oui", "Non"]
+                    question = "Cette personne est elle pertinente à relever dans l'article"
+                    choices = ["Oui c'est un personnage historique important", "Oui c'est un historien ou auteur important","Non"]
                 elif color == "#0000ff":  # bleu
-                    question = "Ce mot en bleu est-il un lieu pertinent ?"
-                    choices = ["Clairement Oui", "Plutôt Oui", "Plutôt Non", "Clairement Non"]
+                    question = "Ce lieu est-il pertinent dans le contexte de l'article ?"
+                    choices = ["Oui", "Non"]
                 elif color == "#008000":  # vert
-                    question = "Est-ce un personnage historique ?"
-                    choices = ["Certainement", "Probablement", "Non"]
+                    question = "Est-ce un personnage important dans cet article ?"
+                    choices = ["Oui c'est un personnage lié à des faits historique important dans l'article", "Oui c'est une personne lié à l'article importante", "Non"]
                 elif color == "#000000":  # noir
-                    question = "Ce mot noir est-il significatif pour le contexte ?"
-                    choices = ["Oui", "Non", "Ne sait pas"]
+                    question = "Cette année/période historique est elle pertinente pour cette article"
+                    choices = ["Oui car elle concerne des faits historiques importants", "Oui car elle est liée à la création de cette article", "Non"]
                 else:
                     question = "Voulez-vous annoter ce mot ?"
                     choices = ["Oui", "Non"]

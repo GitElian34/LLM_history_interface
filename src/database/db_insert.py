@@ -4,12 +4,13 @@ from pathlib import Path
 DB_PATH = Path(__file__).parent / "data.db"
 
 def insert_item(article_id, word, type_, method, pertinence=None):
+    """Permet d'insérer un triplé mot, type du mot et méthode d'extraction dans la table items (créer également l'article s'il n'existe pas)"""
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
 
     cur.execute("SELECT 1 FROM articles WHERE article_id = ?", (article_id,))
     if cur.fetchone() is None:
-        cur.execute("INSERT INTO articles (article_id) VALUES (?)", (article_id,))
+        cur.execute("INSERT INTO articles (article_id,etat) VALUES (?,?)", (article_id,"Non complété"))
         print(f"📄 Nouvel article ajouté : {article_id}")
 
     try:
@@ -25,6 +26,7 @@ def insert_item(article_id, word, type_, method, pertinence=None):
     conn.close()
 
 def update_pertinence(article_id, word, method, pertinence):
+    """Permet de mettre à jour la pertinence d'une entité en particulier (un mot) réserver à l'usage de l'historien"""
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     cur.execute("""
@@ -39,6 +41,25 @@ def update_pertinence(article_id, word, method, pertinence):
     conn.commit()
     conn.close()
 
+def update_etat(article_id: int, etat: str):
+    """Met à jour ou insère l'état d'un article."""
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    print("9")
+    # Vérifie si l'article existe
+    cur.execute("SELECT 1 FROM articles WHERE article_id = ?", (article_id,))
+    if cur.fetchone() is None:
+        # Insère un nouvel article avec son état
+        cur.execute("INSERT INTO articles (article_id, etat) VALUES (?, ?)", (article_id, etat))
+        print(f"📄 Nouvel article ajouté {article_id} avec état='{etat}'")
+    else:
+        # Met à jour l’état
+        cur.execute("UPDATE articles SET etat = ? WHERE article_id = ?", (etat, article_id))
+        print(f"🔄 État mis à jour pour article {article_id} → {etat}")
+
+    conn.commit()
+    conn.close()
+
 # 🔥 Insérer/mettre à jour le texte d’une page
 def insert_pages_dict(article_id, pages_dict: dict):
     """
@@ -46,7 +67,7 @@ def insert_pages_dict(article_id, pages_dict: dict):
 
     Args:
         article_id (int): ID de l'article.
-        pages_dict (dict): Dictionnaire {page_number: texte}
+        pages_dict (dict): Dictionnaire contenant tout le texte de l'article annoté {page_number: texte}
     """
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()

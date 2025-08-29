@@ -6,8 +6,8 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QTextEdit, QVBoxLayout,
 from PyQt6.QtGui import QFont, QTextCharFormat
 from PyQt6.QtCore import Qt
 
-from src.database.db_insert import update_pertinence, insert_item
-from src.database.db_query import get_all_articles, get_article_pages
+from src.database.db_insert import update_pertinence, insert_item, update_etat
+from src.database.db_query import get_all_articles, get_article_pages, search_etat_with_article_id
 
 
 class MultiPageTextApp(QMainWindow):
@@ -17,6 +17,7 @@ class MultiPageTextApp(QMainWindow):
         self.controller = controller  # référence au controller
         self.setWindowTitle("Interface Graphique")
         self.resize(800, 600)
+        self.article_id = article_id
         self.current_page = 0  # Page actuelle
         # Contenu des pages (peut être chargé depuis un fichier)
         self.pages = pages if pages is not None else []
@@ -27,16 +28,21 @@ class MultiPageTextApp(QMainWindow):
 
         top_layout = QHBoxLayout()
         self.article_combo = QComboBox()
-        self.article_combo.addItems([str(a) for a in get_all_articles()])  # liste des articles
-        self.article_combo.setCurrentText(str(article_id))
+        self.article_combo.addItems([(str(a) +" - " +str(search_etat_with_article_id(a))) for a in get_all_articles()])  # liste des articles
+        print((str(article_id) +" - " +str(search_etat_with_article_id(article_id))))
+        self.article_combo.setCurrentText(str(article_id) +" - " +str(search_etat_with_article_id(article_id)))
         self.article_combo.currentIndexChanged.connect(self.change_selected_article)
         top_layout.addWidget(self.article_combo)
         main_layout.addLayout(top_layout)
+
+        self.article_state_button = QPushButton("Modifier")
+        self.article_state_button.clicked.connect(self.open_change_state_dialog)
 
         self.add_button = QPushButton("Ajouter")
         self.add_button.clicked.connect(self.open_add_word_dialog)
 
         top_layout.addWidget(self.add_button)
+        top_layout.addWidget(self.article_state_button)
 
 
         # Zone de texte
@@ -78,6 +84,7 @@ class MultiPageTextApp(QMainWindow):
     def change_selected_article(self):
         selected_article = self.article_combo.currentText()
         print(f"Article sélectionné : {selected_article}")
+        self.article_id= selected_article
         new_article =get_article_pages(selected_article)
         self.controller.pagetoIG(new_article)
         #self.controller.pagetoIG(get_article_pages(selected_article))
@@ -143,9 +150,18 @@ class MultiPageTextApp(QMainWindow):
 
     def open_add_word_dialog(self):
         print("Ajouter")
-        dialog = AddWordDialog()
+        dialog = AddWordDialog(self.article_id)
         print("1")
         dialog.exec()
+
+    def open_change_state_dialog(self):
+        print("Choix")
+        dialog = EtatDialog(self.article_id)
+        print("2")
+        dialog.exec()
+
+
+
 
 
     # def update_page(self, page_number: int, raw_text: str):
@@ -318,6 +334,53 @@ class TextAppController:
         # Met à jour l'affichage si interface ouverte
 
 
+class EtatDialog(QDialog):
+    def __init__(self, article_id,parent=None):
+        super().__init__(parent)
+        self.article_id = article_id
+        self.setWindowTitle("Choisir l'état")
+        self.setModal(True)
+
+        layout = QVBoxLayout(self)
+
+        layout.addWidget(QLabel("Sélectionnez l'état de l'article :"))
+
+            # Groupe de boutons radio
+        self.button_group = QButtonGroup(self)
+        self.radio_incomplet = QRadioButton("Non complété")
+        self.radio_encours = QRadioButton("En cours")
+        self.radio_complet = QRadioButton("Complet")
+
+        self.button_group.addButton(self.radio_incomplet)
+        self.button_group.addButton(self.radio_encours)
+        self.button_group.addButton(self.radio_complet)
+
+        layout.addWidget(self.radio_incomplet)
+        layout.addWidget(self.radio_encours)
+        layout.addWidget(self.radio_complet)
+
+            # Boutons OK/Annuler
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
+                                       QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(self.choice_accepted)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def choice_accepted(self):
+
+        update_etat(self.article_id,self.get_choice())
+
+        print(self.article_id)
+    def get_choice(self):
+
+        if self.radio_incomplet.isChecked():
+            return "incomplet"
+        elif self.radio_encours.isChecked():
+            return "en cours"
+        elif self.radio_complet.isChecked():
+            return "complet"
+        return None
+
 
 
 class StartupDialog(QDialog):
@@ -401,13 +464,14 @@ class PopUpDialog(QDialog):
 
 
 class AddWordDialog(QDialog):
-    def __init__(self, parent=None):
+    def __init__(self, article_id,parent=None):
         super().__init__(parent)
         self.setWindowTitle("Ajouter un mot")
         print("1")
         layout = QVBoxLayout()
 
         # Champ mot
+        self.article_id = article_id
         word_layout = QHBoxLayout()
         word_layout.addWidget(QLabel("Mot :"))
         self.word_input = QLineEdit()
@@ -438,13 +502,13 @@ class AddWordDialog(QDialog):
         word = self.word_input.text().strip()
         category = self.category_combo.currentText()
 
-        if not word or not article_id:
+        if not word or not self.article_id:
             print("⚠ Aucun mot ou article sélectionné.")
             return
 
         # Appeler le contrôleur (qui lui-même insère en base)
-        print(f"✅ Mot ajouté : {word} ({category}) dans article {article_id}")
-        insert_item(article_id, word,category,"Manuellement")
+        print(f"✅ Mot ajouté : {word} ({category}) dans article {self.article_id}")
+        insert_item(self.article_id, word,category,"Manuellement")
         self.word_input.clear()
 
     def get_data(self):
@@ -535,9 +599,9 @@ class HoverTextEdit(QTextEdit):
 
 if __name__ == "__main__":
     controller = TextAppController()
-    article_id=1592
+    #article_id=1592
     # Modifier les pages sans lancer l'interface
 
     # Lancer l'interface quand vous le souhaitez
-    controller.launch_app(get_article_pages(article_id),article_id,data_processor=None)
+    controller.launch_app(get_article_pages(1592),1592,data_processor=None)
 

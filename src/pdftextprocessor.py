@@ -631,13 +631,13 @@ if __name__ == "__main__":
     question6 = ("""Relève simplement tout ce qui pourrait s'apparenter à une année, nouvelle ou ancienne dans ce texte
     """)
 
-    article_id = 1592
+    article_id = 1601
     PATH = "C:/Users/elian/Documents/stage/Recherche/pdf/"
     article_PATH = f"{PATH}{article_id}.pdf"
     #article_path=PATH+str(num_article)+".pdf"
 
     #processor.Test(1, 1, 1, question4,PATH)
-    #processor.FillDB(1, 1, 1, question4,article_PATH,article_id)
+    processor.FillDB(1, 1, 1, question4,article_PATH,article_id)
     #print(get_precision(article_id,"LOC"))
     #processor.Test_with_BDD(article_PATH,article_id)
     # root = tk.Tk()

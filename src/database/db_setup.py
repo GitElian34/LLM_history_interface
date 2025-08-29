@@ -11,11 +11,11 @@ def create_tables():
 
     # Table articles (sans auto-increment, juste int)
     cur.execute("""
-    CREATE TABLE IF NOT EXISTS articles (
-        article_id INT PRIMARY KEY
-    )
-    """)
-
+     CREATE TABLE IF NOT EXISTS articles (
+         article_id INT PRIMARY KEY,
+         etat TEXT
+     )
+     """)
     # Table des items (clé primaire composite : article_id + word + method)
     cur.execute("""
     CREATE TABLE IF NOT EXISTS items (

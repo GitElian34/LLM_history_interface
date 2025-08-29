@@ -4,6 +4,7 @@ from pathlib import Path
 DB_PATH = Path(__file__).parent / "data.db"
 
 def get_all_items(article_id: int):
+    """récupère tout les mots d'un article donné"""
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     cur.execute("SELECT * FROM items WHERE article_id = ?", (article_id,))
@@ -12,6 +13,7 @@ def get_all_items(article_id: int):
     return rows
 
 def get_numbers(article_id: int):
+    """récupère uniquement les mots de type Number d'un article donné"""
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     cur.execute("SELECT word FROM items WHERE type = 'Number' AND article_id = ?", (article_id,))
@@ -20,17 +22,10 @@ def get_numbers(article_id: int):
     return rows
 
 def get_epoques(article_id: int):
+    """récupère uniquement les mots de type Period d'un article donné"""
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     cur.execute("SELECT word FROM items WHERE type = 'Period' AND article_id = ?", (article_id,))
-    rows = [row[0] for row in cur.fetchall()]
-    conn.close()
-    return rows
-
-def get_all_articles():
-    conn = sqlite3.connect(DB_PATH)
-    cur = conn.cursor()
-    cur.execute("SELECT article_id FROM articles")
     rows = [row[0] for row in cur.fetchall()]
     conn.close()
     return rows
@@ -48,6 +43,52 @@ def get_entities(article_id: int):
     for word, type_ in rows:
         entities[type_].append(word)
     return entities
+
+
+def search_etat_with_article_id(article_id: str):
+    """
+    Cherche un mot uniquement dans la table items.
+    Retourne une liste des article_id où le mot est présent.
+    """
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT DISTINCT etat FROM articles WHERE article_id = ?
+    """, (article_id,))
+    results = [row[0] for row in cur.fetchall()]
+
+    conn.close()
+    return results[0]
+
+def search_word_in_db(word: str):
+    """
+    Cherche un mot uniquement dans la table items.
+    Retourne une liste des article_id où le mot est présent.
+    """
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT DISTINCT article_id FROM items WHERE word = ?
+    """, (word,))
+    results = [row[0] for row in cur.fetchall()]
+
+    conn.close()
+    return results
+
+
+def get_all_articles():
+
+    """Récupère tous les ids des articles présents dans la BDD"""
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("SELECT article_id FROM articles")
+    rows = [row[0] for row in cur.fetchall()]
+    conn.close()
+    return rows
+
+
 
 # 🔥 Récupérer le texte d’une page spécifique
 def get_page_text(article_id: int, page_number: int):

@@ -11,15 +11,16 @@ from src.database.db_query import get_all_articles, get_article_pages, search_et
 
 
 class MultiPageTextApp(QMainWindow):
-    def __init__(self, article_id, pages = None,data_processor = None, controller=None):
+    """Classe qui va gérer toutes les classes liées à l'affichage et à l'UI et les pages de l'article'"""
+    def __init__(self, article_id, pages = None, controller=None):
         super().__init__()
-        self.data_processor = data_processor
-        self.controller = controller  # référence au controller
+
+        self.controller = controller        # référence au controller pour permettre de changer d'article
         self.setWindowTitle("Interface Graphique")
         self.resize(800, 600)
-        self.article_id = article_id
-        self.current_page = 0  # Page actuelle
-        # Contenu des pages (peut être chargé depuis un fichier)
+        self.article_id = article_id        # numéro de l'Article actuel présenté sur l'interface
+        self.current_page = 0               # Page actuelle
+        # Contenu des pages sous forme de texte
         self.pages = pages if pages is not None else []
         # Widget central et layout principal
         central_widget = QWidget()
@@ -27,18 +28,16 @@ class MultiPageTextApp(QMainWindow):
         main_layout = QVBoxLayout(central_widget)
 
         top_layout = QHBoxLayout()
-        self.article_combo = QComboBox()
+        self.article_combo = QComboBox()  #Menu pour sélectionner les articles
         self.article_combo.addItems([(str(a) +" - " +str(search_etat_with_article_id(a))) for a in get_all_articles()])  # liste des articles
-        print((str(article_id) +" - " +str(search_etat_with_article_id(article_id))))
-        self.article_combo.setCurrentText(str(article_id) +" - " +str(search_etat_with_article_id(article_id)))
         self.article_combo.currentIndexChanged.connect(self.change_selected_article)
         top_layout.addWidget(self.article_combo)
         main_layout.addLayout(top_layout)
 
-        self.article_state_button = QPushButton("Modifier")
+        self.article_state_button = QPushButton("Modifier") #Menu pour modifier l'état de complétion de l'article
         self.article_state_button.clicked.connect(self.open_change_state_dialog)
 
-        self.add_button = QPushButton("Ajouter")
+        self.add_button = QPushButton("Ajouter")    #Bouton pour ajouter des mots manquants qui seraient importants dans l'article
         self.add_button.clicked.connect(self.open_add_word_dialog)
 
         top_layout.addWidget(self.add_button)
@@ -82,33 +81,49 @@ class MultiPageTextApp(QMainWindow):
         self.display_page()
 
     def change_selected_article(self):
-        selected_article = self.article_combo.currentText()
-        print(f"Article sélectionné : {selected_article}")
-        self.article_id= selected_article
-        new_article =get_article_pages(selected_article)
+        """Permet de switcher entre plusieurs articles présents dans la BDD"""
+        selected_text = self.article_combo.currentText()
+
+        # Récupère uniquement l'ID avant le " - "
+        article_id = selected_text.split(" - ")[0]
+
+        print(f"Article sélectionné (ID seul) : {article_id}")
+
+        self.article_id = article_id  # stocké en string
+
+        new_article = get_article_pages(article_id)
         self.controller.pagetoIG(new_article)
-        #self.controller.pagetoIG(get_article_pages(selected_article))
         self.current_page = 0
         self.display_page()
-        # PATH = "C:/Users/elian/Documents/stage/Recherche/pdf/"
-        # article_PATH = f"{PATH}{selected_article}.pdf"
-        # if self.controller is not None:
-        #     # Récupère le contenu du nouvel article depuis ta DB ou autre
-        #     content = self.data_processor.Test_with_BDD(article_PATH,selected_article)  # à adapter selon ta fonction
-        #     # Met à jour les pages via le controller
-        #    # self.controller.pagetoIG(content)
-        #     # Recharge les pages dans l'interface
-        #    # self.current_page = 0
-        #    # self.display_page()
 
     def refresh_current_page(self):
-        """Recharge la page actuelle"""
+        """Recharge la page actuelle en conservant l'article sélectionné par ID"""
+
+        # Sauvegarder l'ID actuel (avant le clear)
+        current_text = self.article_combo.currentText()
+        current_id = current_text.split(" - ")[0]  # récupère uniquement l’ID avant " - "
+
+        self.article_combo.blockSignals(True)
+        self.article_combo.clear()
+
+        # Recharger tous les articles avec leur état
+        for a in get_all_articles():
+            self.article_combo.addItem(f"{a} - {search_etat_with_article_id(a)}")
+
+        # Retrouver l'index correspondant à l'ID sauvegardé
+        for i in range(self.article_combo.count()):
+            item_id = self.article_combo.itemText(i).split(" - ")[0]
+            if item_id == current_id:
+                self.article_combo.setCurrentIndex(i)
+                break
+
+        self.article_combo.blockSignals(False)
         self.display_page()
 
     def display_page(self):
         """Affiche la page actuelle avec le numéro en bas à droite."""
         # Crée un mot de test avec une infobulle (attribut title)
-
+        print(self.pages[self.current_page])
 
         # Crée le contenu principal + footer
         content = f"""
@@ -149,50 +164,21 @@ class MultiPageTextApp(QMainWindow):
 
 
     def open_add_word_dialog(self):
-        print("Ajouter")
+        """Créer une instance de la class AddWordDialog lorsque le bouton est cliqué"""
         dialog = AddWordDialog(self.article_id)
-        print("1")
         dialog.exec()
 
     def open_change_state_dialog(self):
-        print("Choix")
+        """Créer une instance de la class EtatDialog lorsque le bouton est cliqué"""
         dialog = EtatDialog(self.article_id)
-        print("2")
         dialog.exec()
 
-
-
-
-
-    # def update_page(self, page_number: int, raw_text: str):
-    #     if page_number >= len(self.pages):
-    #         self.pages.append("")
-    #                     # Convertit **mot** en <b>mot</b>
-    #     formatted_text = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', raw_text)
-    #         # Gère les sauts de ligne
-    #     formatted_text = formatted_text.replace(chr(10), "<br>")
-    #
-    #         # Encadre le tout dans une div stylisée
-    #     html_content = f"""
-    #     <div style="font-family: Georgia; font-size: 14px; text-align: justify; padding: 10px;">
-    #         {formatted_text}
-    #     </div>
-    #     """
-    #
-    #     self.pages[page_number] = html_content
-    #
-    #     if self.current_page == page_number:
-    #         self.display_page()
-
-
 class TextAppController:
+    """Classe qui va faire la liaison entre la BDD, les intéraction de l'utilisateur et l'UI"""
     def __init__(self):
-        self.data_processor = None
         self.pages = [
             # Votre contenu initial des pages ici
             """<h1 style="color: #2c3e50; text-align: center;">Page 1</h1>...""",
-            """<h1 style="color: #2c3e50; text-align: center;">Page 2</h1>...""",
-            """<h1 style="color: #2c3e50; text-align: center;">Page 3</h1>..."""
         ]
         self.box_choices = {
             "PERSON": False,
@@ -204,46 +190,53 @@ class TextAppController:
         self.app = None
         self.window = None
 
-
-    def pagetoIG(self,content):
-
-
+    def pagetoIG(self, content):
+        """Cette fonction prend en argument le contenu issu de la BDD et le transforme pour qu'il
+        soit utilisable dans l'interface graphique"""
         num_page = 0
+        # Charger le nouveau contenu
+
         for page in content.values():
-            print(num_page)
-            if type(page) != list:
+            if not isinstance(page, list):  # éviter les listes vides
                 self.update_page(page_number=num_page, raw_text=page)
                 num_page += 1
+        for i in range(len(self.pages) - 1, -1, -1):  # parcours à l'envers pour supprimer les pages en trop restante
+            if i >= len(content):
+                del self.pages[i]
 
 
-    def launch_app(self,content,article_id,data_processor=None):
+    def launch_app(self,content,article_id):
         """Lance l'application graphique"""
-        self.data_processor = data_processor
+
         if QApplication.instance() is None:
             self.app = QApplication([])
         else:
             self.app = QApplication.instance()
 
 
-        startup_dialog = StartupDialog(self.box_choices)
+        startup_dialog = StartupDialog(self.box_choices) #
         if startup_dialog.exec():
             # Optionnel : utiliser les réponses si besoin plus tard
             print("Choix utilisateur :", startup_dialog.box_choices)
         self.pagetoIG(content)
-        self.window = MultiPageTextApp(article_id, self.pages, data_processor=self.data_processor,controller=self)
+        self.window = MultiPageTextApp(article_id, self.pages,controller=self)
         self.window.show()
         self.app.exec()
 
     def update_page(self, page_number: int, raw_text: str):
 
-        """Met à jour une page sans lancer l'interface"""
+        """Met à jour une page sans lancer l'interface
+            Va également se charger de transformer les mots mis en avant dans le texte (date, person,...)
+            en modifiants leur couleur, leur taille et en les mettants en gras
+        """
         if page_number >= len(self.pages):
             self.pages.append("")
+            print("new page")
 
         # Supprimer les mises en forme des mots déjà cochés
         formatted_text = raw_text
 
-        # Met en gras les textes entre ** ** (nombres)
+        # Met en gras les textes entre ** ** (nombres et entre ¦¦ periodes)
         if self.box_choices["YEARs"]:
             formatted_text = re.sub(
                 r'\*\*(.*?)\*\*',
@@ -331,10 +324,9 @@ class TextAppController:
         </div>
         """
 
-        # Met à jour l'affichage si interface ouverte
-
 
 class EtatDialog(QDialog):
+    """classe qui permet de modifier l'état de complétion de l'article sélectionné"""
     def __init__(self, article_id,parent=None):
         super().__init__(parent)
         self.article_id = article_id
@@ -347,7 +339,7 @@ class EtatDialog(QDialog):
 
             # Groupe de boutons radio
         self.button_group = QButtonGroup(self)
-        self.radio_incomplet = QRadioButton("Non complété")
+        self.radio_incomplet = QRadioButton("Incomplet")
         self.radio_encours = QRadioButton("En cours")
         self.radio_complet = QRadioButton("Complet")
 
@@ -371,6 +363,7 @@ class EtatDialog(QDialog):
         update_etat(self.article_id,self.get_choice())
 
         print(self.article_id)
+        self.accept()
     def get_choice(self):
 
         if self.radio_incomplet.isChecked():
@@ -384,6 +377,7 @@ class EtatDialog(QDialog):
 
 
 class StartupDialog(QDialog):
+    """Classe qui permet à l'utilisateur de choisir quel type d'entités nommées il veut mettre en avant dans le texte"""
     def __init__(self,box_choices):
         super().__init__()
         self.setWindowTitle("Préférences avant le démarrage")
@@ -420,6 +414,8 @@ class StartupDialog(QDialog):
 class PopUpDialog(QDialog):
     def __init__(self, mot, choices, question,color, checked_words,article_id,parent=None):
         """
+        Classe qui permet lorsqu'un mot highlight (en gras) est cliqué de définir sa pertinence dans l'article
+
         :param mot: Le mot ciblé pour contextualiser la question
         :param choices: Liste de chaînes représentant les choix (ex: ["Clairement Oui", "Plutôt Oui", ...])
         :param question: Texte de la question à afficher
@@ -452,6 +448,9 @@ class PopUpDialog(QDialog):
         layout.addWidget(valider_btn)
 
     def valider(self):
+        """Mise à jour dans la BDD, highlight étant ici la méthode par défaut
+            cela pourrait d'ailleurs poser problème si l'on modifie la méthode d'extraction
+            """
         selected_id = self.button_group.checkedId()
         if selected_id != -1:
             if self.color =="#000000" :
@@ -464,10 +463,10 @@ class PopUpDialog(QDialog):
 
 
 class AddWordDialog(QDialog):
+    """Classe perméttant à l'utilisateur d'ajouter des mots dans la BDD s'il les pense pertinents pour l'article"""
     def __init__(self, article_id,parent=None):
         super().__init__(parent)
         self.setWindowTitle("Ajouter un mot")
-        print("1")
         layout = QVBoxLayout()
 
         # Champ mot
@@ -477,7 +476,7 @@ class AddWordDialog(QDialog):
         self.word_input = QLineEdit()
         word_layout.addWidget(self.word_input)
         layout.addLayout(word_layout)
-        print("1")
+
         # Champ catégorie
         cat_layout = QHBoxLayout()
         cat_layout.addWidget(QLabel("Catégorie :"))
@@ -485,12 +484,12 @@ class AddWordDialog(QDialog):
         self.category_combo.addItems(["LOC", "PERSON", "ORG", "Number", "Period"])
         cat_layout.addWidget(self.category_combo)
         layout.addLayout(cat_layout)
-        print("1")
+
         # Boutons OK / Annuler
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok)
         buttons.accepted.connect(self.add_word)
         layout.addWidget(buttons)
-        print("1")
+
         self.setLayout(layout)
 
     def reject(self):
@@ -516,6 +515,7 @@ class AddWordDialog(QDialog):
         return self.word_input.text(), self.category_combo.currentText()
 
 class HoverTextEdit(QTextEdit):
+    """classe qui va appeler La classe PopUpdialog pour récupérer le mot qui a été cliqué"""
     def __init__(self,pages,article_id,current_pages, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.reponses_utilisateur = {}  # Pour stocker les réponses
@@ -551,6 +551,7 @@ class HoverTextEdit(QTextEdit):
                 print(f"❌ Impossible de remplacer : '{mot}' (non trouvé dans une balise span)")
 
     def mousePressEvent(self, event):
+        """fonction qui définit le comportement du programme lorsque l'on clique sur un des mots mis en gras"""
         if event.button() == Qt.MouseButton.LeftButton:
             cursor = self.cursorForPosition(event.position().toPoint())
             cursor.select(cursor.SelectionType.WordUnderCursor)
@@ -601,7 +602,7 @@ if __name__ == "__main__":
     controller = TextAppController()
     #article_id=1592
     # Modifier les pages sans lancer l'interface
-
+    first_article_id = get_all_articles()[0]
     # Lancer l'interface quand vous le souhaitez
-    controller.launch_app(get_article_pages(1592),1592,data_processor=None)
+    controller.launch_app(get_article_pages(first_article_id),first_article_id)
 

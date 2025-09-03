@@ -6,6 +6,14 @@ import os
 DB_PATH = Path(__file__).parent / "data.db"
 
 def create_tables():
+    """ Création de 3 tables :
+    - La table articles, qui va contenir le nom des articles (ou leur numéro plutot) ainsi que l'état de complétion de ces derniers
+    - La table items, qui va contenir pour chaque article tous les mots mis en avants de 5 types différents :
+     Loc pour les lieux, Org pour les organismes  PER pour les personnes, Number pour les années et Period pour les périodes historiques
+     accompagnés de leur méthode d'extraction (highlight par défaut) et de leur pertinence (initialisé à null et qui doit être
+     modifié lors de l'utilisation de l'appli)
+    - La table pages, qui va contenir les pages de l'article déja annoté afin de réduire le temps d'exécution et d'utilisation de l'appli
+    """
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
 

@@ -12,7 +12,6 @@ import tkinter as tk
 from tkinter import messagebox
 #from pdftotext import PdftoText
 from collections import *
-from appli_Demo import SearchApp
 from typing import Union, List, Tuple
 
 from src.database.db_insert import *
@@ -28,26 +27,23 @@ from src.extract_text import *
 class PDFTextProcessor:
     def __init__(self):
         """Initialise le processeur de texte PDF"""
-        self.interface_controller = TextAppController()
-        self.llms = ["llama3","gemma","llama2","mistral"]
-        self.currentdates = {}
-        self.periode_histo = []
-        self.periode_histo_ftn = []
-        self.data_clear=[]
+        self.llms = ["llama3","gemma","llama2","mistral"] #Toutes les LLMs utilisé via ollama
+        self.currentdates = {}  #variable pour stocker les années que donnent le LLM
+        self.periode_histo = []  #variable pour stocker les périodes que donnent le LLM sur le texte
+        self.periode_histo_ftn = []   #variable pour stocker les périodes que donnent le LLM sur les footnotes
+        self.ftn_year = {}      #variable pour stocker les années que donnent le LLM pour les footnotes
+        self.data_clear=[]  #currentdates mais passé par la fonctiion de seuil (qu'on utilise pas vraiment au final)
 
-        self.entities_by_type = {
+        self.entities_by_type = { #Hashmap pour stocker les Entités nomées de typer person, org et localisation
         'PERSON': [],
         'LOC': [],
         'ORG': []
     }
-        self.text_clean = None
-        self.app_content = None
-        self.pdftotext = None
-        self.content = None
-        self.foot_notes = None
-        self.ftn_year = {}
-        self.LLM_entities = None
-        self.db = None
+
+
+
+        self.content = None #contenu des articles privés des footnotes
+        self.foot_notes = None #footnotes de l'article
 
     def ask_ollama(self, prompt: str, model: str ) -> Optional[str]:
         """
@@ -55,7 +51,7 @@ class PDFTextProcessor:
 
         Args:
             prompt: Prompt à envoyer
-            model: Modèle à utiliser (par défaut: "mistral")
+            model: Modèle à utiliser
 
         Returns:
             str: Réponse de l'API si succès, None sinon
@@ -524,9 +520,19 @@ class PDFTextProcessor:
         for file in os.listdir(folder_path):
             if file.lower().endswith(".pdf"):
                 # on enlève l'extension pour ne garder que le "nom"
-                pdf_files.append(os.path.splitext(file)[0])
+                pdf_files.append(f"{folder_path}/{os.path.splitext(file)[0]}.pdf")
         return pdf_files
 
+    def extract_article_ids(self, article_list):
+        """Extrait uniquement les IDs (après le dernier '_') d'une liste d'articles, sans le .pdf"""
+        ids = []
+        for article in article_list:
+            # Prend la partie après le dernier underscore
+            article_id = article.split("_")[-1]
+            # Supprime l'extension .pdf si elle est présente
+            article_id = article_id.replace(".pdf", "")
+            ids.append(article_id)
+        return ids
 
     def getdataLLM(self,iter:int,contenu , nbllm:int,epoques, question: str, result ):
         contexte = ("Mon objectif est de prendre un pdf et de mettre en avant toutes"
@@ -576,18 +582,7 @@ class PDFTextProcessor:
 
 
 
-    def Test_with_BDD(self,pdf_path,article_id):
 
-        self.content, self.foot_notes = process_pdf(pdf_path)
-        self.texte_clean = text_wo_footnotes(self.foot_notes, extraire_texte_pdf_par_page(pdf_path))
-
-
-        self.data_clear = get_numbers(article_id)
-        self.entities_by_type = get_entities(article_id)
-        self.periode_histo = get_epoques(article_id)
-        self.app_content = get_article_pages(article_id)
-        print("APP CONTENT /  :")
-        print(self.app_content)
 
 
 if __name__ == "__main__":
@@ -630,14 +625,19 @@ if __name__ == "__main__":
         "- Inclure les années isolées ET les plages (ex: 1214-1322)\n\n")
     question6 = ("""Relève simplement tout ce qui pourrait s'apparenter à une année, nouvelle ou ancienne dans ce texte
     """)
-
+    all_article_path=processor.get_all_pdfs("C:/Users/elian/Documents/stage/Recherche/pdf/2003-42")
+    print(all_article_path)
+    all_article_ids= processor.extract_article_ids(all_article_path)
     article_id = 1601
     PATH = "C:/Users/elian/Documents/stage/Recherche/pdf/"
     article_PATH = f"{PATH}{article_id}.pdf"
     #article_path=PATH+str(num_article)+".pdf"
 
-    #processor.Test(1, 1, 1, question4,PATH)
-    processor.FillDB(1, 1, 1, question4,article_PATH,article_id)
+    for i in range(14,len(all_article_ids)):
+        print("On passe à l'article :")
+        print(all_article_ids[i])
+        processor.FillDB(1, 1, 0, question4, all_article_path[i], all_article_ids[i])
+    # #
     #print(get_precision(article_id,"LOC"))
     #processor.Test_with_BDD(article_PATH,article_id)
     # root = tk.Tk()

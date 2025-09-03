@@ -7,6 +7,9 @@ from src.database.db_query import *
 
 
 class SearchWordWidget(QWidget):
+    """Petite maquette d'une application qui permettrait de rechercher des mots dans la BDD en fonction de certains critères
+    et qui renverrait les articles dans laquelle le mot est présent (date, personne ,...)
+    """
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Recherche de mot")
@@ -34,26 +37,25 @@ class SearchWordWidget(QWidget):
         self.setLayout(layout)
 
     def search_word(self):
-        print("1")
+
         word = self.input_word.text().strip()
         if not word:
             self.results.setText("⚠ Veuillez entrer un mot.")
-            print("2")
+
             return
 
         results = search_word_in_db(word)
 
         if not results:
             self.results.setText(f"❌ Aucun résultat pour « {word} »")
-            print("3")
+
         else:
-            print("4")
+
             text = f"Résultats pour « {word} » :\n\n"
             for  article_id in results:
                 text += f"📄 Article {article_id} \n"
 
             self.results.setText(text)
-        print("5")
 
 if __name__ == "__main__":
     app = QApplication([])

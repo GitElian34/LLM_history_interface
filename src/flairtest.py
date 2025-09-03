@@ -55,7 +55,7 @@ def print_db_data():
 
     for row in db_content['data']:
         print(f" Mot: '{row[0]}' | Type: {row[1]} | Méthode: {row[2]}")
-stanza_nlp = stanza.Pipeline(lang='en', processors='tokenize,ner')
+# stanza_nlp = stanza.Pipeline(lang='en', processors='tokenize,ner')
 
 
 def normalize_string(s):
@@ -83,26 +83,26 @@ def is_entity_in_data(db_entity, true_data_list):
 
     return False
 
-def find_entities_stanza(text: str, entities_by_type: Dict[str, List[str]]):
-    """Utilisation de Stanza pour la NER"""
-    doc = stanza_nlp(text)
-    for sentence in doc.sentences:
-        for entity in sentence.ents:
-            if entity.type == 'PERSON':
-                entities_by_type['PERSON'].append(entity.text)
-                methods_grade["Stanza"][1] += 1
-                normalized_word = re.sub(r'[\s-]', '', entity.text).lower()
-                insert_item(normalized_word, "PERSON", "Stanza")
-            elif entity.type in ['LOC', 'GPE']:
-                entities_by_type['LOC'].append(entity.text)
-                methods_grade["Stanza"][1] += 1
-                normalized_word = re.sub(r'[\s-]', '', entity.text).lower()
-                insert_item(normalized_word, "LOC", "Stanza")
-            elif entity.type == 'ORG':
-                entities_by_type['ORG'].append(entity.text)
-                methods_grade["Stanza"][1] += 1
-                normalized_word = re.sub(r'[\s-]', '', entity.text).lower()
-                insert_item(normalized_word, "ORG", "Stanza")
+# def find_entities_stanza(text: str, entities_by_type: Dict[str, List[str]]):
+#     """Utilisation de Stanza pour la NER"""
+#     doc = stanza_nlp(text)
+#     for sentence in doc.sentences:
+#         for entity in sentence.ents:
+#             if entity.type == 'PERSON':
+#                 entities_by_type['PERSON'].append(entity.text)
+#                 methods_grade["Stanza"][1] += 1
+#                 normalized_word = re.sub(r'[\s-]', '', entity.text).lower()
+#                 insert_item(normalized_word, "PERSON", "Stanza")
+#             elif entity.type in ['LOC', 'GPE']:
+#                 entities_by_type['LOC'].append(entity.text)
+#                 methods_grade["Stanza"][1] += 1
+#                 normalized_word = re.sub(r'[\s-]', '', entity.text).lower()
+#                 insert_item(normalized_word, "LOC", "Stanza")
+#             elif entity.type == 'ORG':
+#                 entities_by_type['ORG'].append(entity.text)
+#                 methods_grade["Stanza"][1] += 1
+#                 normalized_word = re.sub(r'[\s-]', '', entity.text).lower()
+#                 insert_item(normalized_word, "ORG", "Stanza")
 def findREN(text: str,threshold : float, entities_by_type: Dict[str, List[str]]):
     """Méthode originale avec spaCy + Flair"""
     doc = nlp(text)
@@ -205,9 +205,9 @@ def filldatabase(text):
         findREN_fulltext(page, entities_by_type)
         print({k: set(v) for k, v in entities_by_type.items()})
         entities_by_type = {'PERSON': [], 'LOC': [], 'ORG': []}
-        print("\n--- STANZA---")
-        find_entities_stanza(page, entities_by_type)
-        print({k: set(v) for k, v in entities_by_type.items()})
+        # print("\n--- STANZA---")
+        # find_entities_stanza(page, entities_by_type)
+        # print({k: set(v) for k, v in entities_by_type.items()})
 
 def compare_method(true_data):
     """

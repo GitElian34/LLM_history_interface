@@ -31,6 +31,7 @@ def get_epoques(article_id: int):
     return rows
 
 def get_entities(article_id: int):
+    """récupère  les mots de type 'PERSON', 'LOC' ou 'ORG' d'un article donné"""
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     cur.execute("""
@@ -90,14 +91,6 @@ def get_all_articles():
 
 
 
-# 🔥 Récupérer le texte d’une page spécifique
-def get_page_text(article_id: int, page_number: int):
-    conn = sqlite3.connect(DB_PATH)
-    cur = conn.cursor()
-    cur.execute("SELECT text FROM pages WHERE article_id = ? AND page_number = ?", (article_id, page_number))
-    row = cur.fetchone()
-    conn.close()
-    return row[0] if row else None
 
 # 🔥 Récupérer toutes les pages d’un article
 def get_article_pages(article_id: int):
@@ -114,6 +107,12 @@ from pathlib import Path
 DB_PATH = Path(__file__).parent / "data.db"
 
 def get_rappel(article_id: int, type_: str, method: str = "highlight"):
+    """Calcul le rappel sur un article un type et une méthode précise dans la table items.
+       A noté qu'ici la méthode par défaut est highlight car c'est le nom de base que j'ai donné à
+       toutes mes extractions de données pour que les Tests soient plus simple mais il sera plus
+       judicieux de le modifier et de mettre un nom pertinent en fonction de la méthode d'extraction
+    """
+
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
 
@@ -151,6 +150,7 @@ def get_rappel(article_id: int, type_: str, method: str = "highlight"):
 
 
 def get_precision(article_id: int, type_: str, method: str = "highlight"):
+    """Même principe que pour get_rappel, mais avec la précision ici"""
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
 

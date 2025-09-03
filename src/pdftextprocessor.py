@@ -3,25 +3,14 @@ from sqlite3 import IntegrityError
 
 import requests
 import re
-import pdftest
-from docx import Document
-from docx.shared import Pt, RGBColor
-import PyPDF2
-from typing import Optional
 import tkinter as tk
-from tkinter import messagebox
-#from pdftotext import PdftoText
-from collections import *
-from typing import Union, List, Tuple
 
+from docx import Document
+from typing import Optional
+from tkinter import filedialog
 from src.database.db_insert import *
-from src.database.db_query import *
-#from src.SQL.crud import *
-#from src.SQL.config import SessionLocal, get_db
-#from src.SQL.main import init_db
 from src.pdftest import process_pdf
 from flairtest import findREN
-from src.inteface.interface_graphique import TextAppController
 from src.extract_text import *
 
 class PDFTextProcessor:
@@ -70,45 +59,6 @@ class PDFTextProcessor:
             print(f"Erreur inattendue: {str(e)}")
             return None
 
-    def split_text(self, text: str, max_length: int = 2000, overlap: int = 100) -> List[str]:
-        """
-        Découpe un long texte en plusieurs parties avec un chevauchement pour garder le contexte.
-
-        Args:
-            text: Texte à découper
-            max_length: Longueur maximale de chaque partie (défaut: 2000 caractères)
-            overlap: Nombre de caractères de chevauchement entre parties (défaut: 100)
-
-        Returns:
-            Liste des parties du texte
-        """
-        if len(text) <= max_length:
-            return [text]
-
-        parts = []
-        start = 0
-
-        while start < len(text):
-            end = start + max_length
-            # Trouve le dernier point/saut de ligne dans la limite
-            split_at = text.rfind('\n', start, end)
-            if split_at == -1 or split_at < start + (max_length // 2):
-                split_at = text.rfind('. ', start, end)
-                if split_at != -1:
-                    split_at += 1  # Inclure le point
-
-            if split_at == -1 or split_at < start + (max_length // 2):
-                split_at = end
-
-            part = text[start:split_at].strip()
-            if part:
-                parts.append(part)
-
-            # Début suivant avec chevauchement
-            start = max(split_at - overlap, start + 1)
-
-        return parts
-
 
     def ask_question(self,question: str,content: str, llm :str) -> Optional[str]:
 
@@ -150,18 +100,7 @@ class PDFTextProcessor:
                 print(f"Période historique trouvée : {h_ep}")  # Debug optionnel
                 epoques.append(h_ep)
 
-        # 1. Années simples ou plages : 950, 1200-1250
-        # matches = re.findall(r'\b(\d{3,4})\b(?:-(\d{3,4})\b)?', texte)
-        # for debut_str, fin_str in matches:
-        #     debut = int(debut_str)
-        #     if fin_str:
-        #         fin = int(fin_str)
-        #         if (debut, fin) not in seen:
-        #             result.append((debut, fin))
-        #             seen.add((debut, fin))
-        #     elif debut not in seen:
-        #         result.append(debut)
-        #         seen.add(debut)
+
 
         # 1. Extraction des siècles numériques (12th, 13th century/siècle)
         numeric_pattern = r'\b(\d{1,2})(?:st|nd|rd|th|e)\s*(?:century|siècle)?\b'
@@ -184,11 +123,13 @@ class PDFTextProcessor:
                     result.append((debut, fin))
                     seen.add((debut, fin))
 
-        #print(result)
+
 
         return sorted(result, key=lambda x: x[0] if isinstance(x, tuple) else x)
 
     def compter_occurrences_manuel(self, nombres, list):
+        """Permet de compléter la hashmap de compter combien de fois chaque nombre est évoqué si on lance plusieurs requêtes au LLM
+           sur un même article"""
         for nombre in nombres:
             if nombre in list:
                 list[nombre] += 1
@@ -197,9 +138,14 @@ class PDFTextProcessor:
         return list
 
     def clear_data(self, seuil: int, dico) -> List[Union[int, Tuple[int, int]]]:
+        """Continuité de la fonction précédente, cette fonction permet de placer un seuil si on a lancé plusieurs prompts
+         ou plusieurs fois le même prompt afin d'affiner les résultats et empêcher les hallucinations"""
         return [key for key, count in dico.items() if count >= seuil]
 
     def stringtoword(self,text: str) :
+        """  Crée un document Word (.docx) à partir d'une chaîne de texte.
+    Le texte est ajouté dans un paragraphe, puis sauvegardé dans un fichier.
+    Cela permet d'extraire de façon optimal les footnotes"""
         doc = Document()
         p = doc.add_paragraph()
         p.add_run(text)
@@ -215,11 +161,13 @@ class PDFTextProcessor:
             text += f"{page}:\n{content}\n\n"  # \n\n pour saut de ligne double entre pages
         return text.strip()  # .strip() pour supprimer le dernier \n inutile
 
-    import re
-    from typing import List
+
 
     def extract_and_store(self, dict_, nombres_cibles, entities_by_type, epoques_cible: List[str], article_id, pattern=None):
         """
+        NON UTILISE POUR L'INSTANT
+
+
         Parcourt les textes dans le dictionnaire et insère en BDD les entités trouvées
         (PERSON, LOC, ORG, nombres, époques), sans modifier le texte.
 
@@ -281,6 +229,12 @@ class PDFTextProcessor:
 
     def number_to_bold_noDB(self, dict, nombres_cibles, entities_by_type, epoques_cible: List[str], pattern=None):
         """
+         NON UTILISE POUR L'INSTANT
+
+
+
+
+
         Identique à number_to_bold mais sans insertion en base de données.
         Met en évidence nombres, entités et époques dans les valeurs du dictionnaire.
 
@@ -444,74 +398,18 @@ class PDFTextProcessor:
 
         return dict
 
+    def choisir_dossier(self):
+        """Ouvre une fenêtre de sélection de dossier et retourne son chemin"""
+        root = tk.Tk()
+        root.update_idletasks()
+        root.lift()
+        root.attributes('-topmost', True)
+        root.focus_force()
 
-    def replacenum(self, text: str, nombres_cibles,color: RGBColor,epoques_cible: List[str],output ):
-        # 1. Conversion du texte en document Word
-        doc = self.stringtoword(text)
+        folder_path = filedialog.askdirectory(title="Choisissez un dossier", parent=root)
 
-        # 2. Création des motifs séparés
-        # Pattern pour les nombres (sans insensibilité à la casse)
-        pattern_nombres = re.compile(
-            r'(?<!\w)(' + '|'.join(map(re.escape, map(str, nombres_cibles))) + r')(?!\w)'
-        )
-        print(pattern_nombres)
-
-        # Pattern pour les époques (avec insensibilité à la casse)
-
-        pattern_epoques = re.compile(
-            r'(?<!\w)(' + '|'.join(map(re.escape, epoques_cible)) + r')(?!\w)',
-            flags=re.IGNORECASE
-        )
-
-        print(pattern_epoques)
-        # 3. Fusion des motifs en un seul pattern
-        # 3. Fusion des motifs en un seul patterngit
-        combined_pattern = re.compile(
-            f"({pattern_nombres.pattern}|{pattern_epoques.pattern})",
-            flags=re.IGNORECASE | re.DOTALL | re.MULTILINE
-        )
-        print(f"Pattern combiné : {combined_pattern.pattern}")
-
-        # 3. Traitement des paragraphes
-        for paragraph in doc.paragraphs:
-            # Création d'une liste temporaire pour les runs
-            new_runs = []
-            current_text = paragraph.text
-
-            # Trouver toutes les occurrences
-            matches = list(combined_pattern.finditer(current_text))
-            if not matches:
-                continue
-
-            # Reconstruire le paragraphe
-            last_end = 0
-            for match in matches:
-                # Texte avant le match
-                if last_end < match.start():
-                    new_runs.append((current_text[last_end:match.start()], False))
-
-                # Texte du match (à formater)
-                new_runs.append((match.group(), True))
-                last_end = match.end()
-
-            # Texte après le dernier match
-            if last_end < len(current_text):
-                new_runs.append((current_text[last_end:], False))
-
-            # Réappliquer le formatage
-            paragraph.clear()
-
-            for text, should_format in new_runs:
-                run = paragraph.add_run(text)
-                if should_format:
-
-                    run.bold = True
-                    run.font.size = Pt(14)
-                    run.font.color.rgb = color
-    # def initdatabase(self):
-    #     """Initialise la base de données sans supprimer les entrées existantes"""
-    #     init_db()  # S'assure que les tables existent
-    #     self.db = next(get_db())
+        root.destroy()
+        return folder_path
     def get_all_pdfs(self,folder_path: str):
         """
         Parcourt un dossier et retourne la liste des fichiers PDF (sans extension).
@@ -534,28 +432,51 @@ class PDFTextProcessor:
             ids.append(article_id)
         return ids
 
+    def extract_article_names(self, article_list):
+        """Extrait le nom entier d'une liste d'articles, sans le .pdf"""
+        names = []
+        for article in article_list:
+            # Supprime l'extension .pdf si elle est présente
+
+            article_name=article.replace(".pdf", "")
+            article_name = article_name.split("/")[-1]
+            names.append(article_name)
+        return names
+
     def getdataLLM(self,iter:int,contenu , nbllm:int,epoques, question: str, result ):
+        """
+           Analyse un document PDF avec plusieurs modèles de LLM.
+
+           Arguments :
+               contexte (str) : Objectif général de l'analyse (ex. mettre en avant les dates historiques). Optionnel ici
+               mais suffit d'être rajouté dans le prompt
+
+               prompt (str) : Question envoyée aux modèles.
+               nbllm (int) : Nombre de modèles LLM différent que l'on veut utiliser (entre 1 et 4).
+               iter (int) : Nombre d’itérations à effectuer par modèle.
+
+           Fonctionnement :
+               - Parcourt chaque page du contenu du PDF. Cela permet de préciser les réponses en ne donnant au LLM pas trop de contenu d'un coup
+               - Envoie la page et le prompt au modèle choisi.
+               - Extrait et compte les dates/périodes historiques trouvées.
+               - Applique une reconnaissance d’entités nommées (REN).
+               - Répète l’opération pour tous les modèles et itérations.
+           """
+
+
         contexte = ("Mon objectif est de prendre un pdf et de mettre en avant toutes"
                     "les dates et périodes historiques en les mettants en gras et plus gros"
                     "d'où l'importace que tu me mettes uniquement ce que tu vois et pas ce que tu déduis \n")
         prompt = question
         for i in range(0, nbllm):
-
             for j in range(0, iter):
-
                 for page in contenu.values():
-                   # print("LA PAGE RESSEMBLE A \n")
-                   # print(page)
                     response = self.ask_question(prompt, page, self.llms[i])
                     if response:
                         print("Réponse reçue:")
-                        #print(page)
-                        #print(response)
                         annees_trouve = self.extraire_annees_historiques(response,epoques)
-                        print(annees_trouve)
                         self.compter_occurrences_manuel(annees_trouve, result)
                         if type(page) != list:
-
                             findREN(page, 0.80,self.entities_by_type)
 
 
@@ -565,10 +486,31 @@ class PDFTextProcessor:
 
 
     def FillDB(self, iter:int, nbllm:int,seuil :int, question: str,input_path: str,article_id: int ):
-        pdf_path = input_path
+        """
+          Traite un article PDF et insère son contenu enrichi dans la base de données.
+
+          Arguments :
+              iter (int) : Nombre d’itérations de traitement à effectuer.
+              nbllm (int) : Nombre de modèles LLM utilisés pour l’analyse.
+              seuil (int) : Seuil appliqué pour filtrer/clarifier les données extraites.
+              question (str) : Prompt envoyé aux modèles pour guider l’extraction.
+              input_path (str) : Chemin du fichier PDF d’entrée.
+              article_id (int) : Identifiant de l’article associé dans la base de données.
+
+          Fonctionnement :
+              - Convertit le PDF en texte et en notes de bas de page.
+              - Extrait et nettoie les données avec les LLM.
+              - Filtre les résultats selon le seuil.
+              - Traite les notes de bas de page séparément.
+              - Supprime les notes du texte principal.
+              - Inssère toutes les entités nommées ( dates périodes localisation personnes et organisation) dans la BDD
+              - Insère les pages enrichies (dates/entités mises en avant) dans la base.
+          """
+
+
         print("DEBUT DU TEST")
         #content = self.pdftotext.clean_content
-        self.content,self.foot_notes= process_pdf(pdf_path)
+        self.content,self.foot_notes= process_pdf(input_path)
 
         #print(self.content)
         self.getdataLLM(iter,self.content,nbllm,self.periode_histo,question,self.currentdates)
@@ -588,59 +530,16 @@ class PDFTextProcessor:
 if __name__ == "__main__":
     print("début du programme")
     processor = PDFTextProcessor()
-    question1 = ("Quelles sont les périodes historiques couvertes par ce document ?"
-                 " Si une période précise est mentionnée (comme un siècle,"
-                 " par exemple 'XIIIe siècle (1200-1300)'), indiquez-la clairement "
-                 "en précisant les années concernées. Mentionnez également toute année"
-                 " spécifique en rapport avec cette période.")
-
-    question2 = """Analysez le document et :
-    - Identifiez les périodes historiques principales évoquées
-    - Concentre toi UNIQUEMENT sur les années et période historiques anciennes
-    -ets les période historique entre crochet exemple :[Moyen Age]
-    Fournissez une réponse synthétique."""
-
-    question3 = """Extrait du texte tout ce qui pourrait s'apparenter à une année entre l'an 0 et l'an 2020 je ne veux aucune explication
-    simplement que tu écrives toutes les années anciennes ou nouvelles que tu as trouvé, en évitant tous les nombres
-    que tu ne considères pas comme des années. Mets les période historique entre crochet exemple :[Moyen Age]"""
-
-    question4 = """Relève simplement toutes les années et période historique de cet article scientifique, cela peut être
+    question= """Relève simplement toutes les années et période historique de cet article scientifique, cela peut être
     des années comme des Noms propres ex: Moyen Age,grande depression...  N'invente RIEN, uniquement des dates et périodes que je
     pourraient voir écrite dans l'article. Mets les période historique entre crochet exemple :[Moyen Age]"""
+#Permet à l'utilissateur de remplir la BDD avec les articles qu'il veut dans le dossier qu'il choisit
+    choisir_directory= processor.choisir_dossier()
+    all_article_path=processor.get_all_pdfs(choisir_directory)
+    all_article_ids= processor.extract_article_ids(all_article_path)  #Celui là sert pour mes propres dossiers des articles de Persee afin que ça soit plus propre
+    all_article_names=processor.extract_article_names(all_article_path)
 
-    question5 = (
-        "Analysez ce texte académique en histoire médiévale et listez toutes les années non modernes:\n"
-        "1. Liées aux événements historiques décrits (dates d'actes, règnes, batailles)\n"
-        "2. Mentionnées dans le contexte des documents médiévaux étudiés\n"
-        "3. Relatives aux périodes couvertes par les projets d'édition\n\n"
-
-        "Exclure explicitement :\n"
-        "- Les dates de publication/modernes\n"
-        "- Toutes les dates qui font parties des citations bibliographiques\n"
-        "- Les références bibliographiques contemporaines\n\n"
-
-        "Format de sortie exigé :\n"
-        "- Liste unique d'années triées par ordre croissant\n"
-        "- Aucun commentaire, contexte ou explication\n"
-        "- Inclure les années isolées ET les plages (ex: 1214-1322)\n\n")
-    question6 = ("""Relève simplement tout ce qui pourrait s'apparenter à une année, nouvelle ou ancienne dans ce texte
-    """)
-    all_article_path=processor.get_all_pdfs("C:/Users/elian/Documents/stage/Recherche/pdf/2003-42")
-    print(all_article_path)
-    all_article_ids= processor.extract_article_ids(all_article_path)
-    article_id = 1601
-    PATH = "C:/Users/elian/Documents/stage/Recherche/pdf/"
-    article_PATH = f"{PATH}{article_id}.pdf"
-    #article_path=PATH+str(num_article)+".pdf"
-
-    for i in range(14,len(all_article_ids)):
+    for i in range(0,len(all_article_ids)): #parcours tous les pdfs pour les mettre dans la BDD
         print("On passe à l'article :")
-        print(all_article_ids[i])
-        processor.FillDB(1, 1, 0, question4, all_article_path[i], all_article_ids[i])
-    # #
-    #print(get_precision(article_id,"LOC"))
-    #processor.Test_with_BDD(article_PATH,article_id)
-    # root = tk.Tk()
-    #
-    # processor.interface_controller.launch_app(processor.app_content,article_id,data_processor=processor)
-    # root.mainloop()
+        print(all_article_names[i])
+        processor.FillDB(1, 1, 0, question, all_article_path[i], all_article_names[i])

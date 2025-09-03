@@ -412,7 +412,7 @@ class StartupDialog(QDialog):
 
 
 class PopUpDialog(QDialog):
-    def __init__(self, mot, choices, question,color, checked_words,article_id,parent=None):
+    def __init__(self, mot, choices, question,article_id,method = "highlight",parent=None):
         """
         Classe qui permet lorsqu'un mot highlight (en gras) est cliqué de définir sa pertinence dans l'article
 
@@ -422,12 +422,11 @@ class PopUpDialog(QDialog):
         :param parent: Parent Qt (optionnel)
         """
         super().__init__(parent)
+        self.method = method
         self.article_id = article_id
-        self.color = color
         self.setWindowTitle(f"Choix pour : {mot}")
         self.setFixedSize(350, 150 + 30 * len(choices))
         self.mot = mot
-        self.checked_words = checked_words
         self.reponse = None
         self.radio_buttons = []
         self.button_group = QButtonGroup(self)
@@ -453,10 +452,7 @@ class PopUpDialog(QDialog):
             """
         selected_id = self.button_group.checkedId()
         if selected_id != -1:
-            if self.color =="#000000" :
-                update_pertinence(self.article_id,self.mot,"highlight",self.radio_buttons[selected_id].text())
-            else :
-                update_pertinence(self.article_id,self.mot,"highlight",self.radio_buttons[selected_id].text())
+            update_pertinence(self.article_id,self.mot,self.method,self.radio_buttons[selected_id].text())
 
         self.accept()
 
@@ -504,11 +500,40 @@ class AddWordDialog(QDialog):
         if not word or not self.article_id:
             print("⚠ Aucun mot ou article sélectionné.")
             return
-
-        # Appeler le contrôleur (qui lui-même insère en base)
+        if category == "PERSON":  # rouge
+            question = "Cette personne est elle pertinente à relever dans l'article"
+            choices = ["Oui c'est un personnage historique important", "Oui c'est un historien ou auteur important",
+                       "Non"]
+        elif category == "LOC":  # bleu
+            question = "Ce lieu est-il pertinent dans le contexte de l'article ?"
+            choices = ["Oui", "Non"]
+        elif category == "ORG":  # vert
+            question = "Est-ce un organisme important dans cet article ?"
+            choices = ["Oui c'est un organisme lié à des faits historique important ",
+                       "Oui c'est un organisme lié à la création de l'article", "Non"]
+        elif category == "Number":  # noir
+            question = "Cette année/période historique est elle pertinente pour cette article"
+            choices = ["Oui car elle concerne des faits historiques importants",
+                       "Oui car elle est liée à la création de cette article", "Non"]
+        else:
+            question = "Cette année/période historique est elle pertinente pour cette article"
+            choices = ["Oui car elle concerne des faits historiques importants",
+                       "Oui car elle est liée à la création de cette article", "Non"]
+        # Afficher la PopUpDialog
         print(f"✅ Mot ajouté : {word} ({category}) dans article {self.article_id}")
-        insert_item(self.article_id, word,category,"Manuellement")
+        insert_item(self.article_id, word, category, "Manuellement")
         self.word_input.clear()
+        dialog = PopUpDialog(
+            word,
+
+            choices=choices,
+            question=question,
+            article_id=self.article_id,
+            method="Manuellement"
+        )
+        dialog.exec()
+        # Appeler le contrôleur (qui lui-même insère en base)
+
 
     def get_data(self):
         """Renvoie le mot et la catégorie choisis"""
@@ -561,7 +586,7 @@ class HoverTextEdit(QTextEdit):
             is_bold = char_format.fontWeight() == QFont.Weight.Bold
             color = char_format.foreground().color().name().lower()  # couleur en hexadécimal
 
-            if is_bold and word not in self.reponses_utilisateur:
+            if is_bold :
                 # Choix en fonction de la couleur
                 if color == "#ff0000":  # rouge
                     question = "Cette personne est elle pertinente à relever dans l'article"
@@ -570,8 +595,8 @@ class HoverTextEdit(QTextEdit):
                     question = "Ce lieu est-il pertinent dans le contexte de l'article ?"
                     choices = ["Oui", "Non"]
                 elif color == "#008000":  # vert
-                    question = "Est-ce un personnage important dans cet article ?"
-                    choices = ["Oui c'est un personnage lié à des faits historique important dans l'article", "Oui c'est une personne lié à l'article importante", "Non"]
+                    question = "Est-ce un organisme important dans cet article ?"
+                    choices = ["Oui c'est un organisme lié à des faits historique important ", "Oui c'est un organisme lié à la création de l'article", "Non"]
                 elif color == "#000000":  # noir
                     question = "Cette année/période historique est elle pertinente pour cette article"
                     choices = ["Oui car elle concerne des faits historiques importants", "Oui car elle est liée à la création de cette article", "Non"]
@@ -585,8 +610,6 @@ class HoverTextEdit(QTextEdit):
 
                     choices=choices,
                     question=question,
-                    color=color,
-                    checked_words =self.reponses_utilisateur,
                     article_id= self.article_id,
                 )
 

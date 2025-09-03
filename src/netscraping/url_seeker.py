@@ -56,7 +56,7 @@ def download_all_articles(all_articles_links):
 
         for url in urls:
             webbrowser.open(url)
-            time.sleep(2.5)  # Attendre que la page charge
+            time.sleep(4)  # Attendre que la page charge
 
             # Clique sur une position donnée (ajuste si besoin)
             pyautogui.click(x=420, y=650)  # bouton PDF
